@@ -12,6 +12,7 @@ import Deliveries from "./pages/Deliveries";
 import Payments from "./pages/Payments";
 import Stock from "./pages/Stock";
 import Reports from "./pages/Reports";
+import { Users } from "./pages/Users";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +81,16 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <Reports />
+                </Layout>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <AuthGuard>
+                <Layout>
+                  <Users />
                 </Layout>
               </AuthGuard>
             }
