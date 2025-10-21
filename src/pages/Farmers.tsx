@@ -13,7 +13,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Phone, MapPin, User } from "lucide-react";
+import { Plus, Phone, MapPin, User, CreditCard } from "lucide-react";
+import { z } from "zod";
+
+const farmerSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  phone: z.string().regex(/^\d{10}$/, "Phone must be exactly 10 digits"),
+  id_number: z.string().regex(/^\d{16}$/, "National ID must be exactly 16 digits"),
+  village: z.string().min(1, "Village is required").max(100),
+});
 
 interface Farmer {
   id: string;
@@ -63,9 +71,16 @@ const Farmers = () => {
     e.preventDefault();
 
     try {
+      const validatedData = farmerSchema.parse(formData);
+      
       const { error } = await supabase
         .from('farmers')
-        .insert([formData]);
+        .insert([{
+          name: validatedData.name,
+          phone: validatedData.phone,
+          id_number: validatedData.id_number,
+          village: validatedData.village,
+        }]);
 
       if (error) throw error;
 
@@ -78,11 +93,19 @@ const Farmers = () => {
       setFormData({ name: "", phone: "", id_number: "", village: "" });
       fetchFarmers();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to register farmer",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -122,29 +145,50 @@ const Farmers = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
+                <Label htmlFor="phone">Phone Number *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    placeholder="0781234567"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    className="pl-10"
+                    required
+                    maxLength={10}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Exactly 10 digits required</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="id_number">ID Number</Label>
-                <Input
-                  id="id_number"
-                  value={formData.id_number}
-                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
-                />
+                <Label htmlFor="id_number">National ID *</Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="id_number"
+                    placeholder="1234567890123456"
+                    value={formData.id_number}
+                    onChange={(e) => setFormData({ ...formData, id_number: e.target.value.replace(/\D/g, '').slice(0, 16) })}
+                    className="pl-10"
+                    required
+                    maxLength={16}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Exactly 16 digits required</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="village">Village</Label>
-                <Input
-                  id="village"
-                  value={formData.village}
-                  onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                />
+                <Label htmlFor="village">Village *</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="village"
+                    placeholder="Enter village name"
+                    value={formData.village}
+                    onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
               </div>
               <Button type="submit" className="w-full">
                 Register Farmer

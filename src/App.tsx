@@ -13,6 +13,7 @@ import Payments from "./pages/Payments";
 import Stock from "./pages/Stock";
 import Reports from "./pages/Reports";
 import { Users } from "./pages/Users";
+import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,16 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <Users />
+                </Layout>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/wallet"
+            element={
+              <AuthGuard>
+                <Layout>
+                  <Wallet />
                 </Layout>
               </AuthGuard>
             }

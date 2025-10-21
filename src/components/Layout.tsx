@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Menu,
   Shield,
+  Wallet,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -40,6 +41,7 @@ export const Layout = ({ children }: LayoutProps) => {
     { path: "/farmers", icon: Users, label: "Farmers" },
     { path: "/deliveries", icon: TrendingUp, label: "Deliveries" },
     { path: "/payments", icon: DollarSign, label: "Payments" },
+    { path: "/wallet", icon: Wallet, label: "Wallet" },
     { path: "/stock", icon: Package, label: "Parch Stock" },
     { path: "/reports", icon: FileText, label: "Reports" },
     { path: "/users", icon: Shield, label: "Users" },

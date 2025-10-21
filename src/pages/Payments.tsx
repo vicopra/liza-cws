@@ -92,22 +92,41 @@ const Payments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
+      const amount = parseFloat(formData.amount);
+
+      // Insert payment
+      const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert([{
           farmer_id: formData.farmer_id,
-          amount: parseFloat(formData.amount),
+          amount: amount,
           payment_method: formData.payment_method,
           payment_date: formData.payment_date,
           notes: formData.notes || null,
           recorded_by: user.id,
+        }])
+        .select()
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      // Record wallet transaction (deduct from balance)
+      const { error: walletError } = await supabase
+        .from('wallet_transactions')
+        .insert([{
+          transaction_type: 'payment',
+          amount: amount,
+          transaction_date: formData.payment_date,
+          notes: `Payment to farmer`,
+          recorded_by: user.id,
+          payment_id: paymentData.id,
         }]);
 
-      if (error) throw error;
+      if (walletError) throw walletError;
 
       toast({
         title: "Success",
-        description: "Payment recorded successfully",
+        description: "Payment recorded and deducted from wallet",
       });
 
       setDialogOpen(false);
@@ -122,7 +141,7 @@ const Payments = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: "Failed to record payment",
         variant: "destructive",
       });
     }
