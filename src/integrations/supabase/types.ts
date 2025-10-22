@@ -16,10 +16,13 @@ export type Database = {
     Tables: {
       cherry_deliveries: {
         Row: {
+          advance_deducted: number | null
           created_at: string
           delivery_date: string
           farmer_id: string
           id: string
+          payment_due: number | null
+          payment_status: string
           price_per_kg: number
           quantity_kg: number
           recorded_by: string
@@ -27,10 +30,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          advance_deducted?: number | null
           created_at?: string
           delivery_date?: string
           farmer_id: string
           id?: string
+          payment_due?: number | null
+          payment_status?: string
           price_per_kg: number
           quantity_kg: number
           recorded_by: string
@@ -38,10 +44,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          advance_deducted?: number | null
           created_at?: string
           delivery_date?: string
           farmer_id?: string
           id?: string
+          payment_due?: number | null
+          payment_status?: string
           price_per_kg?: number
           quantity_kg?: number
           recorded_by?: string
@@ -64,6 +73,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      farmer_advances: {
+        Row: {
+          advance_date: string
+          amount: number
+          amount_recovered: number
+          balance: number
+          created_at: string
+          farmer_id: string
+          id: string
+          purpose: string | null
+          recorded_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          advance_date?: string
+          amount: number
+          amount_recovered?: number
+          balance: number
+          created_at?: string
+          farmer_id: string
+          id?: string
+          purpose?: string | null
+          recorded_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          advance_date?: string
+          amount?: number
+          amount_recovered?: number
+          balance?: number
+          created_at?: string
+          farmer_id?: string
+          id?: string
+          purpose?: string | null
+          recorded_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       farmers: {
         Row: {
@@ -280,6 +331,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_amount_owed_to_farmers: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_farmer_advance_balance: {
+        Args: { farmer_uuid: string }
+        Returns: number
+      }
+      get_total_advances_owed: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       get_total_coffee_sold: {
         Args: Record<PropertyKey, never>
         Returns: number
