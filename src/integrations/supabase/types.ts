@@ -114,7 +114,15 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "farmer_advances_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       farmers: {
         Row: {
@@ -331,26 +339,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_amount_owed_to_farmers: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      get_amount_owed_to_farmers: { Args: never; Returns: number }
       get_farmer_advance_balance: {
         Args: { farmer_uuid: string }
         Returns: number
       }
-      get_total_advances_owed: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_total_coffee_sold: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_wallet_balance: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      get_total_advances_owed: { Args: never; Returns: number }
+      get_total_coffee_sold: { Args: never; Returns: number }
+      get_wallet_balance: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

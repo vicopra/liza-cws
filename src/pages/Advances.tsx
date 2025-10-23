@@ -48,17 +48,21 @@ export default function Advances() {
   const fetchData = async () => {
     try {
       const [advancesRes, farmersRes] = await Promise.all([
-        supabase.from("farmer_advances").select(`
-          *,
-          farmers(name)
-        `).order("created_at", { ascending: false }),
+        supabase.from("farmer_advances").select("*").order("created_at", { ascending: false }),
         supabase.from("farmers").select("id, name").order("name")
       ]);
 
       if (advancesRes.error) throw advancesRes.error;
       if (farmersRes.error) throw farmersRes.error;
 
-      setAdvances(advancesRes.data || []);
+      // Manually join farmer names
+      const farmersMap = new Map(farmersRes.data?.map(f => [f.id, f.name]));
+      const advancesWithFarmers = (advancesRes.data || []).map(advance => ({
+        ...advance,
+        farmers: { name: farmersMap.get(advance.farmer_id) || 'Unknown' }
+      }));
+
+      setAdvances(advancesWithFarmers);
       setFarmers(farmersRes.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
