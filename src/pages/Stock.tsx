@@ -22,6 +22,14 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Plus, ArrowUp, ArrowDown, Calendar, Package } from "lucide-react";
+import { z } from "zod";
+
+const stockSchema = z.object({
+  transaction_type: z.enum(["input", "output"], { message: "Please select a transaction type" }),
+  quantity_kg: z.number().positive({ message: "Quantity must be greater than 0" }).max(100000, { message: "Quantity must be less than 100,000 kg" }),
+  transaction_date: z.string().nonempty({ message: "Transaction date is required" }),
+  notes: z.string().trim().max(500, { message: "Notes must be less than 500 characters" }).optional(),
+});
 
 interface StockTransaction {
   id: string;
@@ -80,16 +88,23 @@ const Stock = () => {
     e.preventDefault();
 
     try {
+      const validatedData = stockSchema.parse({
+        transaction_type: formData.transaction_type,
+        quantity_kg: parseFloat(formData.quantity_kg),
+        transaction_date: formData.transaction_date,
+        notes: formData.notes,
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from('parch_stock')
         .insert([{
-          transaction_type: formData.transaction_type,
-          quantity_kg: parseFloat(formData.quantity_kg),
-          transaction_date: formData.transaction_date,
-          notes: formData.notes || null,
+          transaction_type: validatedData.transaction_type,
+          quantity_kg: validatedData.quantity_kg,
+          transaction_date: validatedData.transaction_date,
+          notes: validatedData.notes || null,
           recorded_by: user.id,
         }]);
 
@@ -109,11 +124,19 @@ const Stock = () => {
       });
       fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 

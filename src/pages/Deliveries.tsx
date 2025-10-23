@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Calendar, Weight } from "lucide-react";
+import { z } from "zod";
+
+const deliverySchema = z.object({
+  farmer_id: z.string().uuid({ message: "Please select a farmer" }),
+  delivery_date: z.string().nonempty({ message: "Delivery date is required" }),
+  quantity_kg: z.number().positive({ message: "Quantity must be greater than 0" }).max(100000, { message: "Quantity must be less than 100,000 kg" }),
+  price_per_kg: z.number().positive({ message: "Price must be greater than 0" }).max(10000, { message: "Price must be less than 10,000" }),
+});
 
 interface Delivery {
   id: string;
@@ -87,16 +95,23 @@ const Deliveries = () => {
     e.preventDefault();
 
     try {
+      const validatedData = deliverySchema.parse({
+        farmer_id: formData.farmer_id,
+        delivery_date: formData.delivery_date,
+        quantity_kg: parseFloat(formData.quantity_kg),
+        price_per_kg: parseFloat(formData.price_per_kg),
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from('cherry_deliveries')
         .insert([{
-          farmer_id: formData.farmer_id,
-          quantity_kg: parseFloat(formData.quantity_kg),
-          price_per_kg: parseFloat(formData.price_per_kg),
-          delivery_date: formData.delivery_date,
+          farmer_id: validatedData.farmer_id,
+          quantity_kg: validatedData.quantity_kg,
+          price_per_kg: validatedData.price_per_kg,
+          delivery_date: validatedData.delivery_date,
           recorded_by: user.id,
         }]);
 
@@ -116,11 +131,19 @@ const Deliveries = () => {
       });
       fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 

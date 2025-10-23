@@ -50,8 +50,44 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get request body
+    // Parse and validate request body
     const { email, password, full_name, phone, role } = await req.json()
+
+    // Input validation
+    if (!email || typeof email !== 'string' || !email.includes('@') || email.length > 255) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email address' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6 || password.length > 72) {
+      return new Response(
+        JSON.stringify({ error: 'Password must be between 6 and 72 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!full_name || typeof full_name !== 'string' || full_name.trim().length === 0 || full_name.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Full name is required and must be less than 100 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (phone && (typeof phone !== 'string' || phone.length > 20)) {
+      return new Response(
+        JSON.stringify({ error: 'Phone number must be less than 20 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (role && !['admin', 'clerk'].includes(role)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid role. Must be admin or clerk' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Create the user
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({

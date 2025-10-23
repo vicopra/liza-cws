@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 
 interface Advance {
@@ -24,6 +25,12 @@ interface Advance {
     name: string;
   };
 }
+
+const advanceSchema = z.object({
+  farmer_id: z.string().uuid({ message: "Please select a farmer" }),
+  amount: z.number().positive({ message: "Amount must be greater than 0" }).max(1000000, { message: "Amount must be less than 1,000,000" }),
+  purpose: z.string().trim().max(500, { message: "Purpose must be less than 500 characters" }).optional(),
+});
 
 interface Farmer {
   id: string;
@@ -82,13 +89,17 @@ export default function Advances() {
     }
 
     try {
-      const amount = parseFloat(formData.amount);
+      const validatedData = advanceSchema.parse({
+        farmer_id: formData.farmer_id,
+        amount: parseFloat(formData.amount),
+        purpose: formData.purpose,
+      });
       
       const { error } = await supabase.from("farmer_advances").insert({
-        farmer_id: formData.farmer_id,
-        amount,
-        balance: amount,
-        purpose: formData.purpose,
+        farmer_id: validatedData.farmer_id,
+        amount: validatedData.amount,
+        balance: validatedData.amount,
+        purpose: validatedData.purpose || null,
         recorded_by: user.id,
       });
 
@@ -99,8 +110,12 @@ export default function Advances() {
       setFormData({ farmer_id: "", amount: "", purpose: "" });
       fetchData();
     } catch (error) {
-      console.error("Error recording advance:", error);
-      toast.error("Failed to record advance");
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        console.error("Error recording advance:", error);
+        toast.error("Failed to record advance");
+      }
     }
   };
 

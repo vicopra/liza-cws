@@ -22,6 +22,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Calendar, DollarSign } from "lucide-react";
+import { z } from "zod";
+
+const paymentSchema = z.object({
+  farmer_id: z.string().uuid({ message: "Please select a farmer" }),
+  amount: z.number().positive({ message: "Amount must be greater than 0" }).max(10000000, { message: "Amount must be less than 10,000,000" }),
+  payment_date: z.string().nonempty({ message: "Payment date is required" }),
+  payment_method: z.enum(["cash", "mobile_money", "bank_transfer"], { message: "Please select a payment method" }),
+  notes: z.string().trim().max(500, { message: "Notes must be less than 500 characters" }).optional(),
+});
 
 interface Payment {
   id: string;
@@ -89,20 +98,26 @@ const Payments = () => {
     e.preventDefault();
 
     try {
+      const validatedData = paymentSchema.parse({
+        farmer_id: formData.farmer_id,
+        amount: parseFloat(formData.amount),
+        payment_date: formData.payment_date,
+        payment_method: formData.payment_method,
+        notes: formData.notes,
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
-      const amount = parseFloat(formData.amount);
 
       // Insert payment
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert([{
-          farmer_id: formData.farmer_id,
-          amount: amount,
-          payment_method: formData.payment_method,
-          payment_date: formData.payment_date,
-          notes: formData.notes || null,
+          farmer_id: validatedData.farmer_id,
+          amount: validatedData.amount,
+          payment_method: validatedData.payment_method,
+          payment_date: validatedData.payment_date,
+          notes: validatedData.notes || null,
           recorded_by: user.id,
         }])
         .select()
@@ -115,8 +130,8 @@ const Payments = () => {
         .from('wallet_transactions')
         .insert([{
           transaction_type: 'payment',
-          amount: amount,
-          transaction_date: formData.payment_date,
+          amount: validatedData.amount,
+          transaction_date: validatedData.payment_date,
           notes: `Payment to farmer`,
           recorded_by: user.id,
           payment_id: paymentData.id,
@@ -139,11 +154,19 @@ const Payments = () => {
       });
       fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to record payment",
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to record payment",
+          variant: "destructive",
+        });
+      }
     }
   };
 

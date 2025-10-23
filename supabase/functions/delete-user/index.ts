@@ -50,8 +50,25 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get userId from request
+    // Parse and validate request body
     const { userId } = await req.json()
+
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'User ID is required and must be a string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(userId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid user ID format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Prevent admin from deleting themselves
     if (userId === user.id) {

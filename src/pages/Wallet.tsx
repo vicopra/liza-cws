@@ -8,6 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Wallet as WalletIcon, TrendingUp, TrendingDown, DollarSign, Package } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { z } from "zod";
+
+const walletSchema = z.object({
+  amount: z.number().positive({ message: "Amount must be greater than 0" }).max(100000000, { message: "Amount must be less than 100,000,000" }),
+  transaction_date: z.string().nonempty({ message: "Transaction date is required" }),
+  notes: z.string().trim().max(500, { message: "Notes must be less than 500 characters" }).optional(),
+});
 
 interface WalletTransaction {
   id: string;
@@ -93,25 +100,21 @@ const Wallet = () => {
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
+      const validatedData = walletSchema.parse({
+        amount: parseFloat(formData.amount),
+        transaction_date: formData.transaction_date,
+        notes: formData.notes,
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase.from("wallet_transactions").insert({
         transaction_type: "deposit",
-        amount: amount,
-        notes: formData.notes || null,
-        transaction_date: formData.transaction_date,
+        amount: validatedData.amount,
+        notes: validatedData.notes || null,
+        transaction_date: validatedData.transaction_date,
         recorded_by: user.id,
       });
 
@@ -126,11 +129,19 @@ const Wallet = () => {
       setFormData({ amount: "", notes: "", transaction_date: new Date().toISOString().split('T')[0] });
       fetchData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to record deposit",
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to record deposit",
+          variant: "destructive",
+        });
+      }
     }
   };
 
