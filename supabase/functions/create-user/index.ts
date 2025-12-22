@@ -5,6 +5,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Simple in-memory rate limiting (resets on function cold start)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 20; // max requests
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const userLimit = rateLimitMap.get(userId);
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    rateLimitMap.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (userLimit.count >= RATE_LIMIT) {
+    return false;
+  }
+  
+  userLimit.count++;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -49,6 +71,18 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Rate limiting check
+    if (!checkRateLimit(user.id)) {
+      console.warn(`Rate limit exceeded for admin user: ${user.id}`);
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Maximum 20 operations per minute.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Log admin action for audit trail
+    console.log(`Admin action: create-user by ${user.id} at ${new Date().toISOString()}`);
 
     // Parse and validate request body
     const { email, password, full_name, phone, role } = await req.json()
@@ -101,8 +135,9 @@ Deno.serve(async (req) => {
     })
 
     if (createError) {
+      console.error(`Failed to create user: ${createError.message}`);
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: 'Failed to create user. Please try again.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -124,14 +159,17 @@ Deno.serve(async (req) => {
         role: role || 'clerk'
       })
 
+    console.log(`User created successfully: ${newUser.user.id}`);
+
     return new Response(
       JSON.stringify({ success: true, user: newUser.user }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error: any) {
+    console.error(`Create user error: ${error.message}`);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
