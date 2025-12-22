@@ -23,11 +23,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Plus, UserPlus, Calendar, Download, FileText, Printer, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { z } from "zod";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 
 interface CasualWorker {
   id: string;
@@ -243,7 +240,10 @@ export default function CasualWorkers() {
     return new Intl.NumberFormat("en-RW", { style: "currency", currency: "RWF" }).format(amount);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+    
     const doc = new jsPDF();
     const weekRange = `${format(currentWeekStart, "MMM dd")} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "MMM dd, yyyy")}`;
 
@@ -274,12 +274,13 @@ export default function CasualWorkers() {
     toast({ title: "Success", description: "PDF exported successfully" });
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+    const XLSX = await import("xlsx");
     const weekRange = `${format(currentWeekStart, "MMM dd")} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "MMM dd, yyyy")}`;
 
     const data = workers.map((worker) => {
       const { daysWorked, totalPayment } = getWorkerWeeklyStats(worker.id);
-      const row: any = {
+      const row: Record<string, any> = {
         "Worker Name": worker.name,
         "ID Number": worker.id_number || "-",
         Role: worker.role || "-",
