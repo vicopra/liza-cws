@@ -5,6 +5,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Simple in-memory rate limiting (resets on function cold start)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 20; // max requests
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const userLimit = rateLimitMap.get(userId);
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    rateLimitMap.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (userLimit.count >= RATE_LIMIT) {
+    return false;
+  }
+  
+  userLimit.count++;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -50,8 +72,20 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Rate limiting check
+    if (!checkRateLimit(user.id)) {
+      console.warn(`Rate limit exceeded for admin user: ${user.id}`);
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Maximum 20 operations per minute.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Parse and validate request body
     const { userId } = await req.json()
+
+    // Log admin action for audit trail
+    console.log(`Admin action: delete-user ${userId} by ${user.id} at ${new Date().toISOString()}`);
 
     // Input validation
     if (!userId || typeof userId !== 'string') {
@@ -82,11 +116,14 @@ Deno.serve(async (req) => {
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (deleteError) {
+      console.error(`Failed to delete user: ${deleteError.message}`);
       return new Response(
-        JSON.stringify({ error: deleteError.message }),
+        JSON.stringify({ error: 'Failed to delete user. Please try again.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log(`User deleted successfully: ${userId}`);
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -94,8 +131,9 @@ Deno.serve(async (req) => {
     )
 
   } catch (error: any) {
+    console.error(`Delete user error: ${error.message}`);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
