@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      casual_attendance: {
+        Row: {
+          created_at: string
+          daily_wage: number
+          id: string
+          is_present: boolean
+          notes: string | null
+          recorded_by: string
+          work_date: string
+          worker_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_wage: number
+          id?: string
+          is_present?: boolean
+          notes?: string | null
+          recorded_by: string
+          work_date: string
+          worker_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_wage?: number
+          id?: string
+          is_present?: boolean
+          notes?: string | null
+          recorded_by?: string
+          work_date?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "casual_attendance_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "casual_workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      casual_workers: {
+        Row: {
+          created_at: string
+          daily_wage: number
+          id: string
+          id_number: string | null
+          is_active: boolean
+          name: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_wage?: number
+          id?: string
+          id_number?: string | null
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_wage?: number
+          id?: string
+          id_number?: string | null
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cherry_deliveries: {
         Row: {
           advance_deducted: number | null
