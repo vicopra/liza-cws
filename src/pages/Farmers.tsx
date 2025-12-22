@@ -15,6 +15,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Plus, Phone, MapPin, User, CreditCard } from "lucide-react";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const farmerSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -59,7 +60,7 @@ const Farmers = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getUserFriendlyError(error, "fetchFarmers"),
         variant: "destructive",
       });
     } finally {
@@ -102,7 +103,7 @@ const Farmers = () => {
       } else {
         toast({
           title: "Error",
-          description: "Failed to register farmer",
+          description: getUserFriendlyError(error, "registerFarmer"),
           variant: "destructive",
         });
       }

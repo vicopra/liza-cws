@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, UserPlus, Calendar, Download, FileSpreadsheet, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 interface CasualWorker {
   id: string;
@@ -101,7 +102,7 @@ export default function CasualWorkers() {
       .order("name");
 
     if (error) {
-      toast({ title: "Error", description: "Failed to fetch workers", variant: "destructive" });
+      toast({ title: "Error", description: getUserFriendlyError(error, "fetchWorkers"), variant: "destructive" });
     } else {
       setWorkers(data || []);
     }
@@ -119,7 +120,7 @@ export default function CasualWorkers() {
       .lte("work_date", endDate);
 
     if (error) {
-      toast({ title: "Error", description: "Failed to fetch attendance", variant: "destructive" });
+      toast({ title: "Error", description: getUserFriendlyError(error, "fetchAttendance"), variant: "destructive" });
     } else {
       setAttendance(data || []);
     }
@@ -148,7 +149,7 @@ export default function CasualWorkers() {
     });
 
     if (error) {
-      toast({ title: "Error", description: "Failed to add worker", variant: "destructive" });
+      toast({ title: "Error", description: getUserFriendlyError(error, "addWorker"), variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Worker added successfully" });
       setDialogOpen(false);
@@ -182,7 +183,7 @@ export default function CasualWorkers() {
           .eq("id", existingRecord.id);
 
         if (error) {
-          toast({ title: "Error", description: "Failed to update attendance", variant: "destructive" });
+          toast({ title: "Error", description: getUserFriendlyError(error, "updateAttendance"), variant: "destructive" });
         } else {
           fetchAttendance();
         }
@@ -194,7 +195,7 @@ export default function CasualWorkers() {
           .eq("id", existingRecord.id);
 
         if (error) {
-          toast({ title: "Error", description: "Failed to update attendance", variant: "destructive" });
+          toast({ title: "Error", description: getUserFriendlyError(error, "updateAttendance"), variant: "destructive" });
         } else {
           fetchAttendance();
         }
@@ -210,7 +211,7 @@ export default function CasualWorkers() {
       });
 
       if (error) {
-        toast({ title: "Error", description: "Failed to record attendance", variant: "destructive" });
+        toast({ title: "Error", description: getUserFriendlyError(error, "recordAttendance"), variant: "destructive" });
       } else {
         fetchAttendance();
       }

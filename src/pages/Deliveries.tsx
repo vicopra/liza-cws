@@ -22,6 +22,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Plus, Calendar, Weight } from "lucide-react";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const deliverySchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -83,7 +84,7 @@ const Deliveries = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getUserFriendlyError(error, "fetchDeliveries"),
         variant: "destructive",
       });
     } finally {
@@ -140,7 +141,7 @@ const Deliveries = () => {
       } else {
         toast({
           title: "Error",
-          description: error.message,
+          description: getUserFriendlyError(error, "recordDelivery"),
           variant: "destructive",
         });
       }
