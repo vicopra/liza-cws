@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 interface Advance {
   id: string;
@@ -71,9 +72,8 @@ export default function Advances() {
 
       setAdvances(advancesWithFarmers);
       setFarmers(farmersRes.data || []);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load advances");
+    } catch (error: any) {
+      toast.error(getUserFriendlyError(error, "fetchAdvances"));
     } finally {
       setLoading(false);
     }
@@ -109,12 +109,11 @@ export default function Advances() {
       setOpen(false);
       setFormData({ farmer_id: "", amount: "", purpose: "" });
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        console.error("Error recording advance:", error);
-        toast.error("Failed to record advance");
+        toast.error(getUserFriendlyError(error, "recordAdvance"));
       }
     }
   };

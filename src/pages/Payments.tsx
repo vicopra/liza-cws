@@ -23,6 +23,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Plus, Calendar, DollarSign } from "lucide-react";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const paymentSchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -86,7 +87,7 @@ const Payments = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getUserFriendlyError(error, "fetchPayments"),
         variant: "destructive",
       });
     } finally {
@@ -163,7 +164,7 @@ const Payments = () => {
       } else {
         toast({
           title: "Error",
-          description: "Failed to record payment",
+          description: getUserFriendlyError(error, "recordPayment"),
           variant: "destructive",
         });
       }

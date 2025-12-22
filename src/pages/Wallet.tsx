@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Wallet as WalletIcon, TrendingUp, TrendingDown, DollarSign, Package } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const walletSchema = z.object({
   amount: z.number().positive({ message: "Amount must be greater than 0" }).max(100000000, { message: "Amount must be less than 100,000,000" }),
@@ -89,7 +90,7 @@ const Wallet = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to load wallet data",
+        description: getUserFriendlyError(error, "fetchWallet"),
         variant: "destructive",
       });
     } finally {
@@ -138,7 +139,7 @@ const Wallet = () => {
       } else {
         toast({
           title: "Error",
-          description: "Failed to record deposit",
+          description: getUserFriendlyError(error, "recordDeposit"),
           variant: "destructive",
         });
       }

@@ -23,6 +23,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Plus, ArrowUp, ArrowDown, Calendar, Package } from "lucide-react";
 import { z } from "zod";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const stockSchema = z.object({
   transaction_type: z.enum(["input", "output"], { message: "Please select a transaction type" }),
@@ -76,7 +77,7 @@ const Stock = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getUserFriendlyError(error, "fetchStock"),
         variant: "destructive",
       });
     } finally {
@@ -133,7 +134,7 @@ const Stock = () => {
       } else {
         toast({
           title: "Error",
-          description: error.message,
+          description: getUserFriendlyError(error, "recordStock"),
           variant: "destructive",
         });
       }
