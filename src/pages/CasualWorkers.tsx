@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { Plus, UserPlus, Calendar, Download, FileText, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, UserPlus, Calendar, Download, FileSpreadsheet, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { z } from "zod";
 
@@ -240,82 +240,50 @@ export default function CasualWorkers() {
     return new Intl.NumberFormat("en-RW", { style: "currency", currency: "RWF" }).format(amount);
   };
 
-  const exportToPDF = async () => {
-    const jsPDF = (await import("jspdf")).default;
-    const autoTable = (await import("jspdf-autotable")).default;
+  const exportToCSV = () => {
+    const weekRange = `${format(currentWeekStart, "MMM dd")} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "MMM dd, yyyy")}`;
     
-    const doc = new jsPDF();
-    const weekRange = `${format(currentWeekStart, "MMM dd")} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "MMM dd, yyyy")}`;
-
-    doc.setFontSize(18);
-    doc.text("Casual Workers Weekly Report", 14, 22);
-    doc.setFontSize(12);
-    doc.text(`Week: ${weekRange}`, 14, 32);
-
-    const tableData = workers.map((worker) => {
+    // Build CSV content
+    const headers = ["Worker Name", "ID Number", "Role", "Daily Wage", ...DAYS_OF_WEEK, "Days Worked", "Total Payment"];
+    const rows = workers.map((worker) => {
       const { daysWorked, totalPayment } = getWorkerWeeklyStats(worker.id);
-      const presentDays = weekDates.map((date) => (isPresent(worker.id, date) ? "✓" : "-")).join("  ");
-      return [worker.name, worker.role || "-", presentDays, daysWorked.toString(), formatCurrency(totalPayment)];
+      const dayColumns = weekDates.map((date) => (isPresent(worker.id, date) ? "Present" : "Absent"));
+      return [
+        worker.name,
+        worker.id_number || "-",
+        worker.role || "-",
+        worker.daily_wage.toString(),
+        ...dayColumns,
+        daysWorked.toString(),
+        totalPayment.toString(),
+      ];
     });
 
-    autoTable(doc, {
-      head: [["Worker", "Role", "Mon  Tue  Wed  Thu  Fri  Sat  Sun", "Days", "Payment"]],
-      body: tableData,
-      startY: 40,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [34, 139, 34] },
-    });
+    // Add grand total row
+    rows.push([
+      "GRAND TOTAL",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      workers.reduce((sum, w) => sum + getWorkerWeeklyStats(w.id).daysWorked, 0).toString(),
+      getGrandTotal().toString(),
+    ]);
 
-    const finalY = (doc as any).lastAutoTable.finalY || 40;
-    doc.setFontSize(12);
-    doc.text(`Grand Total: ${formatCurrency(getGrandTotal())}`, 14, finalY + 10);
-
-    doc.save(`casual-workers-report-${format(currentWeekStart, "yyyy-MM-dd")}.pdf`);
-    toast({ title: "Success", description: "PDF exported successfully" });
-  };
-
-  const exportToExcel = async () => {
-    const XLSX = await import("xlsx");
-    const weekRange = `${format(currentWeekStart, "MMM dd")} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "MMM dd, yyyy")}`;
-
-    const data = workers.map((worker) => {
-      const { daysWorked, totalPayment } = getWorkerWeeklyStats(worker.id);
-      const row: Record<string, any> = {
-        "Worker Name": worker.name,
-        "ID Number": worker.id_number || "-",
-        Role: worker.role || "-",
-        "Daily Wage": worker.daily_wage,
-      };
-      weekDates.forEach((date, index) => {
-        row[DAYS_OF_WEEK[index]] = isPresent(worker.id, date) ? "Present" : "Absent";
-      });
-      row["Days Worked"] = daysWorked;
-      row["Total Payment"] = totalPayment;
-      return row;
-    });
-
-    // Add summary row
-    data.push({
-      "Worker Name": "GRAND TOTAL",
-      "ID Number": "",
-      Role: "",
-      "Daily Wage": "",
-      Mon: "",
-      Tue: "",
-      Wed: "",
-      Thu: "",
-      Fri: "",
-      Sat: "",
-      Sun: "",
-      "Days Worked": workers.reduce((sum, w) => sum + getWorkerWeeklyStats(w.id).daysWorked, 0),
-      "Total Payment": getGrandTotal(),
-    });
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
-    XLSX.writeFile(wb, `casual-workers-report-${format(currentWeekStart, "yyyy-MM-dd")}.xlsx`);
-    toast({ title: "Success", description: "Excel file exported successfully" });
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `casual-workers-report-${format(currentWeekStart, "yyyy-MM-dd")}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast({ title: "Success", description: "CSV exported successfully" });
   };
 
   const handlePrint = () => {
@@ -381,7 +349,7 @@ export default function CasualWorkers() {
             Attendance
           </TabsTrigger>
           <TabsTrigger value="report">
-            <FileText className="mr-2 h-4 w-4" />
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
             Weekly Report
           </TabsTrigger>
         </TabsList>
@@ -459,13 +427,9 @@ export default function CasualWorkers() {
         <TabsContent value="report" className="space-y-4">
           {/* Export Actions */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={exportToPDF}>
+            <Button variant="outline" onClick={exportToCSV}>
               <Download className="mr-2 h-4 w-4" />
-              Export PDF
-            </Button>
-            <Button variant="outline" onClick={exportToExcel}>
-              <FileText className="mr-2 h-4 w-4" />
-              Export Excel
+              Export CSV
             </Button>
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="mr-2 h-4 w-4" />
