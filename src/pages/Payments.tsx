@@ -21,9 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Calendar, DollarSign } from "lucide-react";
+import { Plus, Calendar, DollarSign, Building2 } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 const paymentSchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -39,7 +40,9 @@ interface Payment {
   amount: number;
   payment_method: string;
   notes: string | null;
+  station_id: string | null;
   farmers: { name: string };
+  stations?: { name: string; code: string } | null;
 }
 
 interface Farmer {
@@ -48,6 +51,7 @@ interface Farmer {
 }
 
 const Payments = () => {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,26 +66,32 @@ const Payments = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentStation]);
 
   const fetchData = async () => {
     try {
-      // Fetch payments
-      const { data: paymentsData, error: paymentsError } = await supabase
+      // Fetch payments with station filter
+      let paymentsQuery = supabase
         .from('payments')
-        .select('*, farmers(name)')
+        .select('*, farmers(name), stations(name, code)')
         .order('payment_date', { ascending: false })
         .limit(50);
 
+      if (currentStation) {
+        paymentsQuery = paymentsQuery.eq('station_id', currentStation.id);
+      }
+
+      const { data: paymentsData, error: paymentsError } = await paymentsQuery;
       if (paymentsError) throw paymentsError;
       setPayments(paymentsData || []);
 
-      // Fetch farmers
-      const { data: farmersData, error: farmersError } = await supabase
-        .from('farmers')
-        .select('id, name')
-        .order('name');
+      // Fetch farmers with station filter
+      let farmersQuery = supabase.from('farmers').select('id, name').order('name');
+      if (currentStation) {
+        farmersQuery = farmersQuery.eq('station_id', currentStation.id);
+      }
 
+      const { data: farmersData, error: farmersError } = await farmersQuery;
       if (farmersError) throw farmersError;
       setFarmers(farmersData || []);
     } catch (error: any) {
@@ -97,6 +107,17 @@ const Payments = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Please select a station first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const validatedData = paymentSchema.parse({
@@ -120,6 +141,7 @@ const Payments = () => {
           payment_date: validatedData.payment_date,
           notes: validatedData.notes || null,
           recorded_by: user.id,
+          station_id: stationId,
         }])
         .select()
         .single();
@@ -136,6 +158,7 @@ const Payments = () => {
           notes: `Payment to farmer`,
           recorded_by: user.id,
           payment_id: paymentData.id,
+          station_id: stationId,
         }]);
 
       if (walletError) throw walletError;
@@ -300,6 +323,12 @@ const Payments = () => {
               </div>
               {payment.notes && (
                 <p className="text-sm text-muted-foreground">{payment.notes}</p>
+              )}
+              {payment.stations && isAdmin && (
+                <div className="flex items-center gap-2 text-primary">
+                  <Building2 className="h-4 w-4" />
+                  <span className="text-sm">{payment.stations.code}</span>
+                </div>
               )}
             </CardContent>
           </Card>

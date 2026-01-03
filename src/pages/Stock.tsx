@@ -21,9 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Plus, ArrowUp, ArrowDown, Calendar, Package } from "lucide-react";
+import { Plus, ArrowUp, ArrowDown, Calendar, Package, Building2 } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 const stockSchema = z.object({
   transaction_type: z.enum(["input", "output"], { message: "Please select a transaction type" }),
@@ -38,9 +39,12 @@ interface StockTransaction {
   transaction_type: string;
   quantity_kg: number;
   notes: string | null;
+  station_id: string | null;
+  stations?: { name: string; code: string } | null;
 }
 
 const Stock = () => {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [currentStock, setCurrentStock] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -54,17 +58,22 @@ const Stock = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentStation]);
 
   const fetchData = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('parch_stock')
-        .select('*')
+        .select('*, stations(name, code)')
         .order('transaction_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(50);
 
+      if (currentStation) {
+        query = query.eq('station_id', currentStation.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setTransactions(data || []);
 
@@ -88,6 +97,17 @@ const Stock = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Please select a station first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const validatedData = stockSchema.parse({
         transaction_type: formData.transaction_type,
@@ -107,6 +127,7 @@ const Stock = () => {
           transaction_date: validatedData.transaction_date,
           notes: validatedData.notes || null,
           recorded_by: user.id,
+          station_id: stationId,
         }]);
 
       if (error) throw error;
@@ -264,6 +285,12 @@ const Stock = () => {
               </div>
               {transaction.notes && (
                 <p className="text-sm text-muted-foreground">{transaction.notes}</p>
+              )}
+              {transaction.stations && isAdmin && (
+                <div className="flex items-center gap-2 text-primary">
+                  <Building2 className="h-4 w-4" />
+                  <span className="text-sm">{transaction.stations.code}</span>
+                </div>
               )}
             </CardContent>
           </Card>

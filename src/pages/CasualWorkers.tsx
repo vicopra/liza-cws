@@ -22,10 +22,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { Plus, UserPlus, Calendar, Download, FileSpreadsheet, Printer, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, UserPlus, Calendar, Download, FileSpreadsheet, Printer, ChevronLeft, ChevronRight, Building2 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from "date-fns";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 interface CasualWorker {
   id: string;
@@ -35,6 +36,8 @@ interface CasualWorker {
   role: string | null;
   daily_wage: number;
   is_active: boolean;
+  station_id: string | null;
+  stations?: { name: string; code: string } | null;
 }
 
 interface AttendanceRecord {
@@ -44,6 +47,7 @@ interface AttendanceRecord {
   is_present: boolean;
   daily_wage: number;
   notes: string | null;
+  station_id: string | null;
 }
 
 const workerSchema = z.object({
@@ -57,6 +61,7 @@ const workerSchema = z.object({
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CasualWorkers() {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [workers, setWorkers] = useState<CasualWorker[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +91,7 @@ export default function CasualWorkers() {
 
   useEffect(() => {
     fetchWorkers();
-  }, []);
+  }, [currentStation]);
 
   useEffect(() => {
     if (workers.length > 0) {
@@ -95,11 +100,17 @@ export default function CasualWorkers() {
   }, [currentWeekStart, workers]);
 
   const fetchWorkers = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("casual_workers")
-      .select("*")
+      .select("*, stations(name, code)")
       .eq("is_active", true)
       .order("name");
+
+    if (currentStation) {
+      query = query.eq('station_id', currentStation.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({ title: "Error", description: getUserFriendlyError(error, "fetchWorkers"), variant: "destructive" });
@@ -113,11 +124,17 @@ export default function CasualWorkers() {
     const startDate = format(currentWeekStart, "yyyy-MM-dd");
     const endDate = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("casual_attendance")
       .select("*")
       .gte("work_date", startDate)
       .lte("work_date", endDate);
+
+    if (currentStation) {
+      query = query.eq('station_id', currentStation.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({ title: "Error", description: getUserFriendlyError(error, "fetchAttendance"), variant: "destructive" });
@@ -127,6 +144,13 @@ export default function CasualWorkers() {
   };
 
   const handleAddWorker = async () => {
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({ title: "Error", description: "Please select a station first", variant: "destructive" });
+      return;
+    }
+
     const validation = workerSchema.safeParse({
       name,
       id_number: idNumber || undefined,
@@ -146,6 +170,7 @@ export default function CasualWorkers() {
       phone: validation.data.phone || null,
       role: validation.data.role || null,
       daily_wage: validation.data.daily_wage,
+      station_id: stationId,
     });
 
     if (error) {
@@ -168,6 +193,13 @@ export default function CasualWorkers() {
 
   const toggleAttendance = async (workerId: string, date: Date, worker: CasualWorker) => {
     if (!userId) return;
+
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({ title: "Error", description: "Please select a station first", variant: "destructive" });
+      return;
+    }
 
     const dateStr = format(date, "yyyy-MM-dd");
     const existingRecord = attendance.find(
@@ -208,6 +240,7 @@ export default function CasualWorkers() {
         is_present: true,
         daily_wage: worker.daily_wage,
         recorded_by: userId,
+        station_id: stationId,
       });
 
       if (error) {

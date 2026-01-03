@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet as WalletIcon, TrendingUp, TrendingDown, DollarSign, Package } from "lucide-react";
+import { Loader2, Wallet as WalletIcon, TrendingUp, TrendingDown, DollarSign, Package, Building2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 const walletSchema = z.object({
   amount: z.number().positive({ message: "Amount must be greater than 0" }).max(100000000, { message: "Amount must be less than 100,000,000" }),
@@ -24,6 +25,8 @@ interface WalletTransaction {
   amount: number;
   notes: string | null;
   created_at: string;
+  station_id: string | null;
+  stations?: { name: string; code: string } | null;
 }
 
 interface WalletStats {
@@ -34,6 +37,7 @@ interface WalletStats {
 }
 
 const Wallet = () => {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [stats, setStats] = useState<WalletStats>({
     balance: 0,
@@ -52,38 +56,45 @@ const Wallet = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentStation]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch wallet balance
-      const { data: balanceData, error: balanceError } = await supabase.rpc('get_wallet_balance');
-      if (balanceError) throw balanceError;
-
-      // Fetch total coffee sold
-      const { data: coffeeData, error: coffeeError } = await supabase.rpc('get_total_coffee_sold');
-      if (coffeeError) throw coffeeError;
-
-      // Fetch transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
+      // Fetch transactions with station filter
+      let transactionsQuery = supabase
         .from("wallet_transactions")
-        .select("*")
+        .select("*, stations(name, code)")
         .order("transaction_date", { ascending: false })
         .order("created_at", { ascending: false });
 
+      if (currentStation) {
+        transactionsQuery = transactionsQuery.eq('station_id', currentStation.id);
+      }
+
+      const { data: transactionsData, error: transactionsError } = await transactionsQuery;
       if (transactionsError) throw transactionsError;
 
-      // Calculate totals
+      // Fetch coffee deliveries with station filter
+      let coffeeQuery = supabase.from('cherry_deliveries').select('quantity_kg');
+      if (currentStation) {
+        coffeeQuery = coffeeQuery.eq('station_id', currentStation.id);
+      }
+      const { data: coffeeData, error: coffeeError } = await coffeeQuery;
+      if (coffeeError) throw coffeeError;
+
+      const totalCoffee = coffeeData?.reduce((sum, d) => sum + Number(d.quantity_kg), 0) || 0;
+
+      // Calculate totals from transactions
       const deposits = transactionsData?.filter(t => t.transaction_type === 'deposit').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
       const payments = transactionsData?.filter(t => t.transaction_type === 'payment').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
 
       setStats({
-        balance: Number(balanceData) || 0,
+        balance: deposits - payments,
         totalDeposits: deposits,
         totalPayments: payments,
-        totalCoffeeSold: Number(coffeeData) || 0,
+        totalCoffeeSold: totalCoffee,
       });
 
       setTransactions(transactionsData || []);
@@ -101,6 +112,17 @@ const Wallet = () => {
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Please select a station first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const validatedData = walletSchema.parse({
         amount: parseFloat(formData.amount),
@@ -117,6 +139,7 @@ const Wallet = () => {
         notes: validatedData.notes || null,
         transaction_date: validatedData.transaction_date,
         recorded_by: user.id,
+        station_id: stationId,
       });
 
       if (error) throw error;
@@ -287,6 +310,12 @@ const Wallet = () => {
                       </p>
                       {transaction.notes && (
                         <p className="text-sm text-muted-foreground italic">{transaction.notes}</p>
+                      )}
+                      {transaction.stations && isAdmin && (
+                        <div className="flex items-center gap-1 text-primary">
+                          <Building2 className="h-3 w-3" />
+                          <span className="text-xs">{transaction.stations.code}</span>
+                        </div>
                       )}
                     </div>
                   </div>
