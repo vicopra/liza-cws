@@ -22,6 +22,7 @@ export type Database = {
           is_present: boolean
           notes: string | null
           recorded_by: string
+          station_id: string | null
           work_date: string
           worker_id: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           is_present?: boolean
           notes?: string | null
           recorded_by: string
+          station_id?: string | null
           work_date: string
           worker_id: string
         }
@@ -42,10 +44,18 @@ export type Database = {
           is_present?: boolean
           notes?: string | null
           recorded_by?: string
+          station_id?: string | null
           work_date?: string
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "casual_attendance_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "casual_attendance_worker_id_fkey"
             columns: ["worker_id"]
@@ -65,6 +75,7 @@ export type Database = {
           name: string
           phone: string | null
           role: string | null
+          station_id: string | null
           updated_at: string
         }
         Insert: {
@@ -76,6 +87,7 @@ export type Database = {
           name: string
           phone?: string | null
           role?: string | null
+          station_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -87,9 +99,18 @@ export type Database = {
           name?: string
           phone?: string | null
           role?: string | null
+          station_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "casual_workers_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cherry_deliveries: {
         Row: {
@@ -103,6 +124,7 @@ export type Database = {
           price_per_kg: number
           quantity_kg: number
           recorded_by: string
+          station_id: string | null
           total_amount: number | null
           updated_at: string
         }
@@ -117,6 +139,7 @@ export type Database = {
           price_per_kg: number
           quantity_kg: number
           recorded_by: string
+          station_id?: string | null
           total_amount?: number | null
           updated_at?: string
         }
@@ -131,6 +154,7 @@ export type Database = {
           price_per_kg?: number
           quantity_kg?: number
           recorded_by?: string
+          station_id?: string | null
           total_amount?: number | null
           updated_at?: string
         }
@@ -149,6 +173,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cherry_deliveries_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       farmer_advances: {
@@ -162,6 +193,7 @@ export type Database = {
           id: string
           purpose: string | null
           recorded_by: string
+          station_id: string | null
           status: string
           updated_at: string
         }
@@ -175,6 +207,7 @@ export type Database = {
           id?: string
           purpose?: string | null
           recorded_by: string
+          station_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -188,6 +221,7 @@ export type Database = {
           id?: string
           purpose?: string | null
           recorded_by?: string
+          station_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -199,6 +233,13 @@ export type Database = {
             referencedRelation: "farmers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "farmer_advances_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       farmers: {
@@ -208,6 +249,7 @@ export type Database = {
           id_number: string | null
           name: string
           phone: string | null
+          station_id: string | null
           updated_at: string
           village: string | null
         }
@@ -217,6 +259,7 @@ export type Database = {
           id_number?: string | null
           name: string
           phone?: string | null
+          station_id?: string | null
           updated_at?: string
           village?: string | null
         }
@@ -226,10 +269,19 @@ export type Database = {
           id_number?: string | null
           name?: string
           phone?: string | null
+          station_id?: string | null
           updated_at?: string
           village?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "farmers_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parch_stock: {
         Row: {
@@ -238,6 +290,7 @@ export type Database = {
           notes: string | null
           quantity_kg: number
           recorded_by: string
+          station_id: string | null
           transaction_date: string
           transaction_type: string
         }
@@ -247,6 +300,7 @@ export type Database = {
           notes?: string | null
           quantity_kg: number
           recorded_by: string
+          station_id?: string | null
           transaction_date?: string
           transaction_type: string
         }
@@ -256,6 +310,7 @@ export type Database = {
           notes?: string | null
           quantity_kg?: number
           recorded_by?: string
+          station_id?: string | null
           transaction_date?: string
           transaction_type?: string
         }
@@ -265,6 +320,13 @@ export type Database = {
             columns: ["recorded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parch_stock_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
             referencedColumns: ["id"]
           },
         ]
@@ -279,6 +341,7 @@ export type Database = {
           payment_date: string
           payment_method: string | null
           recorded_by: string
+          station_id: string | null
         }
         Insert: {
           amount: number
@@ -289,6 +352,7 @@ export type Database = {
           payment_date?: string
           payment_method?: string | null
           recorded_by: string
+          station_id?: string | null
         }
         Update: {
           amount?: number
@@ -299,6 +363,7 @@ export type Database = {
           payment_date?: string
           payment_method?: string | null
           recorded_by?: string
+          station_id?: string | null
         }
         Relationships: [
           {
@@ -313,6 +378,13 @@ export type Database = {
             columns: ["recorded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
             referencedColumns: ["id"]
           },
         ]
@@ -337,6 +409,36 @@ export type Database = {
           full_name?: string
           id?: string
           phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stations: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          location: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name?: string
           updated_at?: string
         }
         Relationships: []
@@ -370,6 +472,42 @@ export type Database = {
           },
         ]
       }
+      user_station_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          station_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          station_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          station_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_station_assignments_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_station_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallet_transactions: {
         Row: {
           amount: number
@@ -378,6 +516,7 @@ export type Database = {
           notes: string | null
           payment_id: string | null
           recorded_by: string
+          station_id: string | null
           transaction_date: string
           transaction_type: string
         }
@@ -388,6 +527,7 @@ export type Database = {
           notes?: string | null
           payment_id?: string | null
           recorded_by: string
+          station_id?: string | null
           transaction_date?: string
           transaction_type: string
         }
@@ -398,6 +538,7 @@ export type Database = {
           notes?: string | null
           payment_id?: string | null
           recorded_by?: string
+          station_id?: string | null
           transaction_date?: string
           transaction_type?: string
         }
@@ -409,6 +550,13 @@ export type Database = {
             referencedRelation: "payments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "wallet_transactions_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -416,6 +564,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_station: {
+        Args: { _station_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_amount_owed_to_farmers: { Args: never; Returns: number }
       get_farmer_advance_balance: {
         Args: { farmer_uuid: string }
@@ -423,6 +575,7 @@ export type Database = {
       }
       get_total_advances_owed: { Args: never; Returns: number }
       get_total_coffee_sold: { Args: never; Returns: number }
+      get_user_stations: { Args: { _user_id: string }; Returns: string[] }
       get_wallet_balance: { Args: never; Returns: number }
       has_role: {
         Args: {
