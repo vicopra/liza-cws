@@ -2,6 +2,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { StationSelector } from "@/components/StationSelector";
+import { useStation } from "@/contexts/StationContext";
 import {
   Coffee,
   Users,
@@ -27,6 +29,7 @@ export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { currentStation } = useStation();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -105,19 +108,25 @@ export const Layout = ({ children }: LayoutProps) => {
             <div className="w-10 h-10 rounded-full bg-primary-foreground/10 flex items-center justify-center">
               <Coffee className="w-6 h-6 text-primary-foreground" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-lg font-bold text-primary-foreground">Liza Coffee</h1>
-              <p className="text-xs text-primary-foreground/80">Washing Station</p>
+              <p className="text-xs text-primary-foreground/80">
+                {currentStation ? currentStation.name : "All Stations"}
+              </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </Button>
+          
+          <div className="flex items-center gap-4">
+            <StationSelector />
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
+          </div>
         </div>
       </header>
 

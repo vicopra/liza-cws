@@ -13,9 +13,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Phone, MapPin, User, CreditCard } from "lucide-react";
+import { Plus, Phone, MapPin, User, CreditCard, Building2 } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 const farmerSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -30,10 +31,13 @@ interface Farmer {
   phone: string | null;
   id_number: string | null;
   village: string | null;
+  station_id: string | null;
   created_at: string;
+  stations?: { name: string; code: string } | null;
 }
 
 const Farmers = () => {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -46,14 +50,21 @@ const Farmers = () => {
 
   useEffect(() => {
     fetchFarmers();
-  }, []);
+  }, [currentStation]);
 
   const fetchFarmers = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('farmers')
-        .select('*')
+        .select('*, stations(name, code)')
         .order('created_at', { ascending: false });
+
+      // Filter by station if one is selected
+      if (currentStation) {
+        query = query.eq('station_id', currentStation.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setFarmers(data || []);
@@ -71,6 +82,18 @@ const Farmers = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Require station selection for non-admins or when no current station
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Please select a station first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const validatedData = farmerSchema.parse(formData);
       
@@ -81,6 +104,7 @@ const Farmers = () => {
           phone: validatedData.phone,
           id_number: validatedData.id_number,
           village: validatedData.village,
+          station_id: stationId,
         }]);
 
       if (error) throw error;
@@ -227,6 +251,12 @@ const Farmers = () => {
               {farmer.id_number && (
                 <div className="text-sm text-muted-foreground">
                   ID: {farmer.id_number}
+                </div>
+              )}
+              {farmer.stations && isAdmin && (
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <Building2 className="h-4 w-4" />
+                  <span>{farmer.stations.code}</span>
                 </div>
               )}
             </CardContent>

@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Calendar, Weight } from "lucide-react";
+import { Plus, Calendar, Weight, Building2 } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
 
 const deliverySchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -37,7 +38,9 @@ interface Delivery {
   quantity_kg: number;
   price_per_kg: number;
   total_amount: number;
+  station_id: string | null;
   farmers: { name: string };
+  stations?: { name: string; code: string } | null;
 }
 
 interface Farmer {
@@ -46,6 +49,7 @@ interface Farmer {
 }
 
 const Deliveries = () => {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,26 +63,32 @@ const Deliveries = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentStation]);
 
   const fetchData = async () => {
     try {
-      // Fetch deliveries
-      const { data: deliveriesData, error: deliveriesError } = await supabase
+      // Fetch deliveries with station filter
+      let deliveriesQuery = supabase
         .from('cherry_deliveries')
-        .select('*, farmers(name)')
+        .select('*, farmers(name), stations(name, code)')
         .order('delivery_date', { ascending: false })
         .limit(50);
 
+      if (currentStation) {
+        deliveriesQuery = deliveriesQuery.eq('station_id', currentStation.id);
+      }
+
+      const { data: deliveriesData, error: deliveriesError } = await deliveriesQuery;
       if (deliveriesError) throw deliveriesError;
       setDeliveries(deliveriesData || []);
 
-      // Fetch farmers
-      const { data: farmersData, error: farmersError } = await supabase
-        .from('farmers')
-        .select('id, name')
-        .order('name');
+      // Fetch farmers with station filter
+      let farmersQuery = supabase.from('farmers').select('id, name').order('name');
+      if (currentStation) {
+        farmersQuery = farmersQuery.eq('station_id', currentStation.id);
+      }
 
+      const { data: farmersData, error: farmersError } = await farmersQuery;
       if (farmersError) throw farmersError;
       setFarmers(farmersData || []);
     } catch (error: any) {
@@ -94,6 +104,17 @@ const Deliveries = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Please select a station first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const validatedData = deliverySchema.parse({
@@ -114,6 +135,7 @@ const Deliveries = () => {
           price_per_kg: validatedData.price_per_kg,
           delivery_date: validatedData.delivery_date,
           recorded_by: user.id,
+          station_id: stationId,
         }]);
 
       if (error) throw error;
@@ -269,6 +291,12 @@ const Deliveries = () => {
                   {delivery.quantity_kg} kg @ {delivery.price_per_kg} RWF/kg
                 </span>
               </div>
+              {delivery.stations && isAdmin && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-primary">{delivery.stations.code}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

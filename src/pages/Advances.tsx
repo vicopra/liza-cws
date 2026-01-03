@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { useStation } from "@/contexts/StationContext";
+import { Building2 } from "lucide-react";
 
 interface Advance {
   id: string;
@@ -22,9 +24,11 @@ interface Advance {
   purpose: string;
   status: string;
   created_at: string;
+  station_id: string | null;
   farmers?: {
     name: string;
   };
+  stations?: { name: string; code: string } | null;
 }
 
 const advanceSchema = z.object({
@@ -39,6 +43,7 @@ interface Farmer {
 }
 
 export default function Advances() {
+  const { currentStation, userStations, isAdmin } = useStation();
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,13 +56,25 @@ export default function Advances() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentStation]);
 
   const fetchData = async () => {
     try {
+      // Build advances query with station filter
+      let advancesQuery = supabase.from("farmer_advances").select("*, stations(name, code)").order("created_at", { ascending: false });
+      if (currentStation) {
+        advancesQuery = advancesQuery.eq('station_id', currentStation.id);
+      }
+
+      // Build farmers query with station filter
+      let farmersQuery = supabase.from("farmers").select("id, name").order("name");
+      if (currentStation) {
+        farmersQuery = farmersQuery.eq('station_id', currentStation.id);
+      }
+
       const [advancesRes, farmersRes] = await Promise.all([
-        supabase.from("farmer_advances").select("*").order("created_at", { ascending: false }),
-        supabase.from("farmers").select("id, name").order("name")
+        advancesQuery,
+        farmersQuery
       ]);
 
       if (advancesRes.error) throw advancesRes.error;
@@ -67,7 +84,7 @@ export default function Advances() {
       const farmersMap = new Map(farmersRes.data?.map(f => [f.id, f.name]));
       const advancesWithFarmers = (advancesRes.data || []).map(advance => ({
         ...advance,
-        farmers: { name: farmersMap.get(advance.farmer_id) || 'Unknown' }
+        farmers: { name: farmersMap.get(advance.farmer_id) || 'Unknown' },
       }));
 
       setAdvances(advancesWithFarmers);
@@ -88,6 +105,13 @@ export default function Advances() {
       return;
     }
 
+    const stationId = currentStation?.id || (userStations.length === 1 ? userStations[0].id : null);
+    
+    if (!stationId && !isAdmin) {
+      toast.error("Please select a station first");
+      return;
+    }
+
     try {
       const validatedData = advanceSchema.parse({
         farmer_id: formData.farmer_id,
@@ -101,6 +125,7 @@ export default function Advances() {
         balance: validatedData.amount,
         purpose: validatedData.purpose || null,
         recorded_by: user.id,
+        station_id: stationId,
       });
 
       if (error) throw error;
@@ -242,6 +267,15 @@ export default function Advances() {
                   <p className="text-sm text-muted-foreground">Purpose</p>
                   <p className="text-sm">{advance.purpose || "N/A"}</p>
                 </div>
+                {advance.stations && isAdmin && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Station</p>
+                    <div className="flex items-center gap-1 text-primary">
+                      <Building2 className="h-4 w-4" />
+                      <span className="text-sm font-medium">{advance.stations.code}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

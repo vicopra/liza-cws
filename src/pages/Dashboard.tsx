@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Coffee, Users, DollarSign, Package } from "lucide-react";
+import { useStation } from "@/contexts/StationContext";
 
 interface DashboardStats {
   totalFarmers: number;
@@ -12,6 +13,7 @@ interface DashboardStats {
 }
 
 export const Dashboard = () => {
+  const { currentStation } = useStation();
   const [stats, setStats] = useState<DashboardStats>({
     totalFarmers: 0,
     todayDeliveries: 0,
@@ -23,41 +25,39 @@ export const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [currentStation]);
 
   const fetchStats = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Fetch total farmers
-      const { count: farmersCount } = await supabase
-        .from('farmers')
-        .select('*', { count: 'exact', head: true });
+      // Fetch total farmers with station filter
+      let farmersQuery = supabase.from('farmers').select('*', { count: 'exact', head: true });
+      if (currentStation) farmersQuery = farmersQuery.eq('station_id', currentStation.id);
+      const { count: farmersCount } = await farmersQuery;
 
-      // Fetch today's deliveries
-      const { data: todayDeliveries, error: deliveriesError } = await supabase
-        .from('cherry_deliveries')
-        .select('quantity_kg')
-        .eq('delivery_date', today);
+      // Fetch today's deliveries with station filter
+      let deliveriesQuery = supabase.from('cherry_deliveries').select('quantity_kg').eq('delivery_date', today);
+      if (currentStation) deliveriesQuery = deliveriesQuery.eq('station_id', currentStation.id);
+      const { data: todayDeliveries, error: deliveriesError } = await deliveriesQuery;
 
       if (deliveriesError) throw deliveriesError;
 
       const todayKg = todayDeliveries?.reduce((sum, d) => sum + Number(d.quantity_kg), 0) || 0;
 
-      // Fetch today's payments
-      const { data: todayPayments, error: paymentsError } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('payment_date', today);
+      // Fetch today's payments with station filter
+      let paymentsQuery = supabase.from('payments').select('amount').eq('payment_date', today);
+      if (currentStation) paymentsQuery = paymentsQuery.eq('station_id', currentStation.id);
+      const { data: todayPayments, error: paymentsError } = await paymentsQuery;
 
       if (paymentsError) throw paymentsError;
 
       const todayPaymentsSum = todayPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
-      // Calculate parch stock
-      const { data: stockData, error: stockError } = await supabase
-        .from('parch_stock')
-        .select('transaction_type, quantity_kg');
+      // Calculate parch stock with station filter
+      let stockQuery = supabase.from('parch_stock').select('transaction_type, quantity_kg');
+      if (currentStation) stockQuery = stockQuery.eq('station_id', currentStation.id);
+      const { data: stockData, error: stockError } = await stockQuery;
 
       if (stockError) throw stockError;
 
@@ -88,7 +88,9 @@ export const Dashboard = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of today's operations</p>
+        <p className="text-muted-foreground">
+          {currentStation ? `${currentStation.name} - Today's operations` : "All Stations - Today's operations"}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

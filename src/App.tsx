@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { Layout } from "./components/Layout";
+import { StationProvider } from "./contexts/StationContext";
 import Auth from "./pages/Auth";
 import { Dashboard } from "./pages/Dashboard";
 import Farmers from "./pages/Farmers";
@@ -31,9 +32,11 @@ const App = () => (
             path="/"
             element={
               <AuthGuard>
-                <Layout>
-                  <Dashboard />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Dashboard />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -41,9 +44,11 @@ const App = () => (
             path="/farmers"
             element={
               <AuthGuard>
-                <Layout>
-                  <Farmers />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Farmers />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -51,9 +56,11 @@ const App = () => (
             path="/deliveries"
             element={
               <AuthGuard>
-                <Layout>
-                  <Deliveries />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Deliveries />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -61,9 +68,11 @@ const App = () => (
             path="/payments"
             element={
               <AuthGuard>
-                <Layout>
-                  <Payments />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Payments />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -71,9 +80,11 @@ const App = () => (
             path="/stock"
             element={
               <AuthGuard>
-                <Layout>
-                  <Stock />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Stock />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -81,9 +92,11 @@ const App = () => (
             path="/reports"
             element={
               <AuthGuard>
-                <Layout>
-                  <Reports />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Reports />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -91,9 +104,11 @@ const App = () => (
             path="/casual-workers"
             element={
               <AuthGuard>
-                <Layout>
-                  <CasualWorkers />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <CasualWorkers />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -101,9 +116,11 @@ const App = () => (
             path="/users"
             element={
               <AuthGuard>
-                <Layout>
-                  <Users />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Users />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />
@@ -111,9 +128,11 @@ const App = () => (
             path="/wallet"
             element={
               <AuthGuard>
-                <Layout>
-                  <Wallet />
-                </Layout>
+                <StationProvider>
+                  <Layout>
+                    <Wallet />
+                  </Layout>
+                </StationProvider>
               </AuthGuard>
             }
           />

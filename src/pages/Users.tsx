@@ -26,20 +26,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { UserPlus, Shield, Trash2 } from "lucide-react";
+import { UserPlus, Shield, Trash2, Building2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+interface Station {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface User {
   id: string;
   full_name: string;
   phone: string | null;
   role: string;
+  stations: Station[];
 }
 
 export const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [stationDialogOpen, setStationDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedStations, setSelectedStations] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -47,10 +60,12 @@ export const Users = () => {
     full_name: "",
     phone: "",
     role: "clerk",
+    station_ids: [] as string[],
   });
 
   useEffect(() => {
     checkAdminStatus();
+    fetchStations();
     fetchUsers();
   }, []);
 
@@ -68,6 +83,18 @@ export const Users = () => {
     setIsAdmin(!!data);
   };
 
+  const fetchStations = async () => {
+    const { data, error } = await supabase
+      .from("stations")
+      .select("id, name, code")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error) {
+      setStations(data || []);
+    }
+  };
+
   const fetchUsers = async () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
@@ -82,10 +109,20 @@ export const Users = () => {
 
       if (rolesError) throw rolesError;
 
-      const usersWithRoles = profiles?.map((profile) => ({
-        ...profile,
-        role: roles?.find((r) => r.user_id === profile.id)?.role || "clerk",
-      })) || [];
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from("user_station_assignments")
+        .select("user_id, station_id, stations(id, name, code)");
+
+      if (assignmentsError) throw assignmentsError;
+
+      const usersWithRoles = profiles?.map((profile) => {
+        const userAssignments = assignments?.filter(a => a.user_id === profile.id) || [];
+        return {
+          ...profile,
+          role: roles?.find((r) => r.user_id === profile.id)?.role || "clerk",
+          stations: userAssignments.map(a => a.stations).filter(Boolean) as Station[],
+        };
+      }) || [];
 
       setUsers(usersWithRoles);
     } catch (error) {
@@ -121,7 +158,13 @@ export const Users = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: formData.full_name,
+            phone: formData.phone,
+            role: formData.role,
+          }),
         }
       );
 
@@ -129,6 +172,22 @@ export const Users = () => {
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to create user");
+      }
+
+      // Assign stations to the new user
+      if (formData.station_ids.length > 0 && result.userId) {
+        const stationAssignments = formData.station_ids.map(stationId => ({
+          user_id: result.userId,
+          station_id: stationId,
+        }));
+
+        const { error: assignError } = await supabase
+          .from("user_station_assignments")
+          .insert(stationAssignments);
+
+        if (assignError) {
+          console.error("Error assigning stations:", assignError);
+        }
       }
 
       toast({
@@ -143,6 +202,7 @@ export const Users = () => {
         full_name: "",
         phone: "",
         role: "clerk",
+        station_ids: [],
       });
       fetchUsers();
     } catch (error: any) {
@@ -198,6 +258,69 @@ export const Users = () => {
     }
   };
 
+  const openStationDialog = (user: User) => {
+    setSelectedUser(user);
+    setSelectedStations(user.stations.map(s => s.id));
+    setStationDialogOpen(true);
+  };
+
+  const handleSaveStations = async () => {
+    if (!selectedUser) return;
+
+    try {
+      // Delete existing assignments
+      await supabase
+        .from("user_station_assignments")
+        .delete()
+        .eq("user_id", selectedUser.id);
+
+      // Insert new assignments
+      if (selectedStations.length > 0) {
+        const assignments = selectedStations.map(stationId => ({
+          user_id: selectedUser.id,
+          station_id: stationId,
+        }));
+
+        const { error } = await supabase
+          .from("user_station_assignments")
+          .insert(assignments);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Station assignments updated",
+      });
+
+      setStationDialogOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update station assignments",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleStationInForm = (stationId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      station_ids: prev.station_ids.includes(stationId)
+        ? prev.station_ids.filter(id => id !== stationId)
+        : [...prev.station_ids, stationId],
+    }));
+  };
+
+  const toggleStation = (stationId: string) => {
+    setSelectedStations(prev =>
+      prev.includes(stationId)
+        ? prev.filter(id => id !== stationId)
+        : [...prev, stationId]
+    );
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -227,7 +350,7 @@ export const Users = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground">Manage system users and roles</p>
+          <p className="text-muted-foreground">Manage system users, roles, and station assignments</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -236,7 +359,7 @@ export const Users = () => {
               Create User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create New User</DialogTitle>
             </DialogHeader>
@@ -299,11 +422,33 @@ export const Users = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="admin">Admin (All Stations)</SelectItem>
                     <SelectItem value="clerk">Clerk</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {formData.role !== "admin" && (
+                <div>
+                  <Label>Assign to Stations</Label>
+                  <div className="mt-2 space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                    {stations.map((station) => (
+                      <div key={station.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`station-${station.id}`}
+                          checked={formData.station_ids.includes(station.id)}
+                          onCheckedChange={() => toggleStationInForm(station.id)}
+                        />
+                        <label
+                          htmlFor={`station-${station.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {station.name} ({station.code})
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Button type="submit" className="w-full">
                 Create User
               </Button>
@@ -311,6 +456,37 @@ export const Users = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Station Assignment Dialog */}
+      <Dialog open={stationDialogOpen} onOpenChange={setStationDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Stations to {selectedUser?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {stations.map((station) => (
+                <div key={station.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`assign-${station.id}`}
+                    checked={selectedStations.includes(station.id)}
+                    onCheckedChange={() => toggleStation(station.id)}
+                  />
+                  <label
+                    htmlFor={`assign-${station.id}`}
+                    className="text-sm cursor-pointer"
+                  >
+                    {station.name} ({station.code})
+                  </label>
+                </div>
+              ))}
+            </div>
+            <Button onClick={handleSaveStations} className="w-full">
+              Save Assignments
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -323,6 +499,7 @@ export const Users = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Stations</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -332,16 +509,44 @@ export const Users = () => {
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.phone || "-"}</TableCell>
                   <TableCell>
-                    <span className="capitalize">{user.role}</span>
+                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {user.role === "admin" ? (
+                      <span className="text-sm text-muted-foreground">All Stations</span>
+                    ) : user.stations.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {user.stations.map((station) => (
+                          <Badge key={station.id} variant="outline">
+                            {station.code}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-destructive">No stations assigned</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      {user.role !== "admin" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openStationDialog(user)}
+                        >
+                          <Building2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
