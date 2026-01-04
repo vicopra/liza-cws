@@ -17,6 +17,7 @@ import {
   Shield,
   Wallet,
   HardHat,
+  Building2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -29,7 +30,7 @@ export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { currentStation } = useStation();
+  const { currentStation, isAdmin } = useStation();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -49,28 +50,31 @@ export const Layout = ({ children }: LayoutProps) => {
     { path: "/stock", icon: Package, label: "Parch Stock" },
     { path: "/casual-workers", icon: HardHat, label: "Casual Workers" },
     { path: "/reports", icon: FileText, label: "Reports" },
-    { path: "/users", icon: Shield, label: "Users" },
+    { path: "/users", icon: Shield, label: "Users", adminOnly: true },
+    { path: "/stations", icon: Building2, label: "Stations", adminOnly: true },
   ];
 
   const NavLinks = () => (
     <nav className="space-y-1">
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = location.pathname === item.path;
-        return (
-          <Link key={item.path} to={item.path} onClick={() => setSheetOpen(false)}>
-            <Button
-              variant={isActive ? "secondary" : "ghost"}
-              className={`w-full justify-start ${
-                isActive ? "bg-secondary font-medium" : ""
-              }`}
-            >
-              <Icon className="mr-2 h-4 w-4" />
-              {item.label}
-            </Button>
-          </Link>
-        );
-      })}
+      {navItems
+        .filter((item) => !item.adminOnly || isAdmin)
+        .map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          return (
+            <Link key={item.path} to={item.path} onClick={() => setSheetOpen(false)}>
+              <Button
+                variant={isActive ? "secondary" : "ghost"}
+                className={`w-full justify-start ${
+                  isActive ? "bg-secondary font-medium" : ""
+                }`}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Button>
+            </Link>
+          );
+        })}
     </nav>
   );
 

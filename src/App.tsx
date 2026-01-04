@@ -16,6 +16,7 @@ import Reports from "./pages/Reports";
 import { Users } from "./pages/Users";
 import Wallet from "./pages/Wallet";
 import CasualWorkers from "./pages/CasualWorkers";
+import Stations from "./pages/Stations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -131,6 +132,18 @@ const App = () => (
                 <StationProvider>
                   <Layout>
                     <Wallet />
+                  </Layout>
+                </StationProvider>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/stations"
+            element={
+              <AuthGuard>
+                <StationProvider>
+                  <Layout>
+                    <Stations />
                   </Layout>
                 </StationProvider>
               </AuthGuard>
