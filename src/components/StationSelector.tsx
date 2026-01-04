@@ -48,7 +48,11 @@ export const StationSelector = () => {
         <Building2 className="h-4 w-4 mr-2" />
         <SelectValue placeholder="Select station" />
       </SelectTrigger>
-      <SelectContent className="pointer-events-auto z-[100]">
+      <SelectContent 
+        position="popper" 
+        sideOffset={5}
+        className="bg-popover border shadow-lg"
+      >
         {isAdmin && (
           <SelectItem value="all">All Stations</SelectItem>
         )}
