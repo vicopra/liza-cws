@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, TrendingUp, Users, DollarSign } from "lucide-react";
+import { Calendar, TrendingUp, Users, DollarSign, Building2 } from "lucide-react";
+import { useStation } from "@/contexts/StationContext";
 
 interface FarmerReport {
   id: string;
@@ -17,33 +18,52 @@ interface FarmerReport {
 const Reports = () => {
   const [farmersReport, setFarmersReport] = useState<FarmerReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const { currentStation } = useStation();
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [currentStation]);
 
   const fetchReports = async () => {
     try {
-      // Fetch all farmers with their delivery and payment data
-      const { data: farmers, error: farmersError } = await supabase
-        .from('farmers')
-        .select('id, name');
+      setLoading(true);
+      
+      // Build farmers query based on station filter
+      let farmersQuery = supabase.from('farmers').select('id, name, station_id');
+      
+      if (currentStation) {
+        farmersQuery = farmersQuery.eq('station_id', currentStation.id);
+      }
+
+      const { data: farmers, error: farmersError } = await farmersQuery;
 
       if (farmersError) throw farmersError;
 
       const reportsData: FarmerReport[] = await Promise.all(
         (farmers || []).map(async (farmer) => {
-          // Get deliveries
-          const { data: deliveries } = await supabase
+          // Get deliveries - filter by station if selected
+          let deliveriesQuery = supabase
             .from('cherry_deliveries')
             .select('quantity_kg, total_amount')
             .eq('farmer_id', farmer.id);
+          
+          if (currentStation) {
+            deliveriesQuery = deliveriesQuery.eq('station_id', currentStation.id);
+          }
 
-          // Get payments
-          const { data: payments } = await supabase
+          const { data: deliveries } = await deliveriesQuery;
+
+          // Get payments - filter by station if selected
+          let paymentsQuery = supabase
             .from('payments')
             .select('amount')
             .eq('farmer_id', farmer.id);
+          
+          if (currentStation) {
+            paymentsQuery = paymentsQuery.eq('station_id', currentStation.id);
+          }
+
+          const { data: payments } = await paymentsQuery;
 
           const totalKg = deliveries?.reduce((sum, d) => sum + Number(d.quantity_kg), 0) || 0;
           const totalValue = deliveries?.reduce((sum, d) => sum + Number(d.total_amount), 0) || 0;
@@ -75,9 +95,17 @@ const Reports = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground">View detailed reports and analytics</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">View detailed reports and analytics</p>
+        </div>
+        {currentStation && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 text-sm font-medium">
+            <Building2 className="h-4 w-4 text-primary" />
+            <span>Filtered: {currentStation.name}</span>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="farmers" className="space-y-4">
