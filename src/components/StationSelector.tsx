@@ -44,16 +44,22 @@ export const StationSelector = () => {
         }
       }}
     >
-      <SelectTrigger className="w-[200px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
-        <Building2 className="h-4 w-4 mr-2" />
-        <SelectValue placeholder="Select station" />
+      <SelectTrigger className="w-[200px] bg-background/20 border-background/30 text-primary-foreground hover:bg-background/30">
+        <Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
+        <SelectValue placeholder="Select station">
+          {currentStation ? currentStation.name : "All Stations"}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent 
+        className="bg-popover border border-border shadow-lg z-[9999]"
+        position="popper"
+        sideOffset={4}
+      >
         {isAdmin && (
-          <SelectItem value="all">All Stations</SelectItem>
+          <SelectItem value="all" className="cursor-pointer">All Stations</SelectItem>
         )}
         {availableStations.map((station) => (
-          <SelectItem key={station.id} value={station.id}>
+          <SelectItem key={station.id} value={station.id} className="cursor-pointer">
             {station.name}
           </SelectItem>
         ))}
