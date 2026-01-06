@@ -1,15 +1,20 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useState } from "react";
 import { useStation } from "@/contexts/StationContext";
-import { Building2 } from "lucide-react";
+import { Building2, Check, ChevronDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const StationSelector = () => {
   const { stations, currentStation, setCurrentStation, isAdmin, userStations, loading } = useStation();
+  const [open, setOpen] = useState(false);
 
   if (loading) {
     return (
@@ -32,38 +37,67 @@ export const StationSelector = () => {
     );
   }
 
+  const handleSelect = (stationId: string | null) => {
+    if (stationId === null) {
+      setCurrentStation(null);
+    } else {
+      const station = availableStations.find(s => s.id === stationId);
+      setCurrentStation(station || null);
+    }
+    setOpen(false);
+  };
+
   return (
-    <Select
-      value={currentStation?.id || "all"}
-      onValueChange={(value) => {
-        if (value === "all") {
-          setCurrentStation(null);
-        } else {
-          const station = availableStations.find(s => s.id === value);
-          setCurrentStation(station || null);
-        }
-      }}
-    >
-      <SelectTrigger className="w-[200px] bg-background/20 border-background/30 text-primary-foreground hover:bg-background/30">
-        <Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
-        <SelectValue placeholder="Select station">
-          {currentStation ? currentStation.name : "All Stations"}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent 
-        className="bg-popover border border-border shadow-lg z-[9999]"
-        position="popper"
-        sideOffset={4}
-      >
-        {isAdmin && (
-          <SelectItem value="all" className="cursor-pointer">All Stations</SelectItem>
-        )}
-        {availableStations.map((station) => (
-          <SelectItem key={station.id} value={station.id} className="cursor-pointer">
-            {station.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button 
+          variant="outline" 
+          className="w-[200px] justify-between bg-background/20 border-background/30 text-primary-foreground hover:bg-background/30 hover:text-primary-foreground"
+        >
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">
+              {currentStation ? currentStation.name : "All Stations"}
+            </span>
+          </div>
+          <ChevronDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[300px]">
+        <DialogHeader>
+          <DialogTitle>Select Station</DialogTitle>
+          <DialogDescription>
+            Choose a station to filter data
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1 mt-2 max-h-[300px] overflow-y-auto">
+          {isAdmin && (
+            <button
+              onClick={() => handleSelect(null)}
+              className={cn(
+                "flex items-center justify-between w-full px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
+                !currentStation && "bg-accent"
+              )}
+            >
+              <span>All Stations</span>
+              {!currentStation && <Check className="h-4 w-4 text-primary" />}
+            </button>
+          )}
+          {availableStations.map((station) => (
+            <button
+              key={station.id}
+              onClick={() => handleSelect(station.id)}
+              className={cn(
+                "flex items-center justify-between w-full px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
+                currentStation?.id === station.id && "bg-accent"
+              )}
+            >
+              <span>{station.name}</span>
+              {currentStation?.id === station.id && <Check className="h-4 w-4 text-primary" />}
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
