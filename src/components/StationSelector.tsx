@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStation } from "@/contexts/StationContext";
-import { Building2, Check, ChevronDown } from "lucide-react";
+import { Building2, Check, ChevronDown, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,8 @@ export const StationSelector = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-        <Building2 className="h-4 w-4" />
+      <div className="flex items-center gap-2 px-3 py-2 text-sm text-primary-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
         <span>Loading...</span>
       </div>
     );
@@ -27,11 +27,11 @@ export const StationSelector = () => {
 
   const availableStations = isAdmin ? stations : userStations;
 
-  // If only one station available, show it as static text
+  // If only one station available and not admin, show it as static text
   if (availableStations.length === 1 && !isAdmin) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 text-sm font-medium">
-        <Building2 className="h-4 w-4 text-primary" />
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 text-sm font-medium text-primary-foreground">
+        <Building2 className="h-4 w-4" />
         <span>{availableStations[0].name}</span>
       </div>
     );
@@ -63,7 +63,7 @@ export const StationSelector = () => {
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[300px]">
+      <DialogContent className="sm:max-w-[320px]">
         <DialogHeader>
           <DialogTitle>Select Station</DialogTitle>
           <DialogDescription>
@@ -73,9 +73,10 @@ export const StationSelector = () => {
         <div className="flex flex-col gap-1 mt-2 max-h-[300px] overflow-y-auto">
           {isAdmin && (
             <button
+              type="button"
               onClick={() => handleSelect(null)}
               className={cn(
-                "flex items-center justify-between w-full px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
+                "flex items-center justify-between w-full px-3 py-3 text-left rounded-md hover:bg-accent transition-colors text-foreground",
                 !currentStation && "bg-accent"
               )}
             >
@@ -83,19 +84,26 @@ export const StationSelector = () => {
               {!currentStation && <Check className="h-4 w-4 text-primary" />}
             </button>
           )}
-          {availableStations.map((station) => (
-            <button
-              key={station.id}
-              onClick={() => handleSelect(station.id)}
-              className={cn(
-                "flex items-center justify-between w-full px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
-                currentStation?.id === station.id && "bg-accent"
-              )}
-            >
-              <span>{station.name}</span>
-              {currentStation?.id === station.id && <Check className="h-4 w-4 text-primary" />}
-            </button>
-          ))}
+          {availableStations.length === 0 ? (
+            <div className="px-3 py-3 text-muted-foreground text-sm">
+              No stations available
+            </div>
+          ) : (
+            availableStations.map((station) => (
+              <button
+                key={station.id}
+                type="button"
+                onClick={() => handleSelect(station.id)}
+                className={cn(
+                  "flex items-center justify-between w-full px-3 py-3 text-left rounded-md hover:bg-accent transition-colors text-foreground",
+                  currentStation?.id === station.id && "bg-accent"
+                )}
+              >
+                <span>{station.name}</span>
+                {currentStation?.id === station.id && <Check className="h-4 w-4 text-primary" />}
+              </button>
+            ))
+          )}
         </div>
       </DialogContent>
     </Dialog>
