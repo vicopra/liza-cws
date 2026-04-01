@@ -145,7 +145,7 @@ export const Users = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
           },
           body: JSON.stringify({
             email: formData.email,
@@ -233,7 +233,7 @@ export const Users = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? '' ?? ''}`,
           },
           body: JSON.stringify({ userId }),
         }

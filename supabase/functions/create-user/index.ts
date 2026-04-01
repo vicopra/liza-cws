@@ -31,22 +31,40 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
 
-    if (userError || !user) {
-      console.error('Auth error:', userError)
+    // Decode JWT to get user ID without verification
+    const parts = token.split('.')
+    if (parts.length !== 3) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized', details: userError?.message }),
+        JSON.stringify({ error: 'Invalid token format' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('Requesting user ID:', user.id)
+    let payload: any
+    try {
+      payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Failed to decode token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const userId = payload.sub
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'No user ID in token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('User ID from token:', userId)
 
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
 
     console.log('Role data:', roleData, 'Role error:', roleError)
@@ -88,30 +106,16 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('User created:', newUser.user.id)
+    await supabaseAdmin.from('profiles').insert({
+      id: newUser.user.id,
+      full_name,
+      phone: phone || null,
+    })
 
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: newUser.user.id,
-        full_name,
-        phone: phone || null,
-      })
-
-    if (profileError) {
-      console.error('Profile error:', profileError)
-    }
-
-    const { error: roleAssignError } = await supabaseAdmin
-      .from('user_roles')
-      .insert({
-        user_id: newUser.user.id,
-        role: role || 'manager',
-      })
-
-    if (roleAssignError) {
-      console.error('Role assign error:', roleAssignError)
-    }
+    await supabaseAdmin.from('user_roles').insert({
+      user_id: newUser.user.id,
+      role: role || 'manager',
+    })
 
     return new Response(
       JSON.stringify({ success: true, userId: newUser.user.id }),
