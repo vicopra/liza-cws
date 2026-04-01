@@ -38,7 +38,7 @@ export const StationProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Check if user is admin
+      // Check user role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -58,16 +58,15 @@ export const StationProvider = ({ children }: { children: ReactNode }) => {
       setStations(allStations || []);
 
       if (userIsAdmin) {
-        // Admins can access all stations
+        // Admins can access all stations and switch freely
         setUserStations(allStations || []);
-        // Default to "All Stations" for admin (null means all)
         const savedStationId = localStorage.getItem('currentStationId');
         if (savedStationId && savedStationId !== 'all') {
           const saved = allStations?.find(s => s.id === savedStationId);
           setCurrentStation(saved || null);
         }
       } else {
-        // Fetch user's assigned stations
+        // Managers are locked to their assigned stations
         const { data: assignments } = await supabase
           .from('user_station_assignments')
           .select('station_id')
@@ -77,11 +76,11 @@ export const StationProvider = ({ children }: { children: ReactNode }) => {
         const assignedStations = allStations?.filter(s => assignedStationIds.includes(s.id)) || [];
         setUserStations(assignedStations);
 
-        // Set current station to first assigned station if only one
+        // Lock manager to their first assigned station
         if (assignedStations.length === 1) {
           setCurrentStation(assignedStations[0]);
           localStorage.setItem('currentStationId', assignedStations[0].id);
-        } else if (assignedStations.length > 0) {
+        } else if (assignedStations.length > 1) {
           const savedStationId = localStorage.getItem('currentStationId');
           if (savedStationId) {
             const saved = assignedStations.find(s => s.id === savedStationId);

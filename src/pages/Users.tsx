@@ -60,13 +60,13 @@ export const Users = () => {
     password: "",
     full_name: "",
     phone: "",
-    role: "clerk",
+    role: "manager",
     station_ids: [] as string[],
   });
   const [editData, setEditData] = useState({
     full_name: "",
     phone: "",
-    role: "clerk",
+    role: "manager",
     station_ids: [] as string[],
   });
 
@@ -118,7 +118,7 @@ export const Users = () => {
         const userAssignments = assignments?.filter(a => a.user_id === profile.id) || [];
         return {
           ...profile,
-          role: roles?.find((r) => r.user_id === profile.id)?.role || "clerk",
+          role: roles?.find((r) => r.user_id === profile.id)?.role || "manager",
           stations: userAssignments.map(a => a.stations).filter(Boolean) as Station[],
         };
       }) || [];
@@ -164,13 +164,12 @@ export const Users = () => {
           user_id: result.userId,
           station_id: stationId,
         }));
-        const { error: assignError } = await supabase.from("user_station_assignments").insert(stationAssignments);
-        if (assignError) console.error("Error assigning stations:", assignError);
+        await supabase.from("user_station_assignments").insert(stationAssignments);
       }
 
       toast({ title: "Success", description: "User created successfully" });
       setOpen(false);
-      setFormData({ email: "", password: "", full_name: "", phone: "", role: "clerk", station_ids: [] });
+      setFormData({ email: "", password: "", full_name: "", phone: "", role: "manager", station_ids: [] });
       fetchUsers();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -210,8 +209,7 @@ export const Users = () => {
           user_id: selectedUser.id,
           station_id: stationId,
         }));
-        const { error: assignError } = await supabase.from("user_station_assignments").insert(assignments);
-        if (assignError) throw assignError;
+        await supabase.from("user_station_assignments").insert(assignments);
       }
 
       toast({ title: "Success", description: "User updated successfully" });
@@ -263,8 +261,7 @@ export const Users = () => {
           user_id: selectedUser.id,
           station_id: stationId,
         }));
-        const { error } = await supabase.from("user_station_assignments").insert(assignments);
-        if (error) throw error;
+        await supabase.from("user_station_assignments").insert(assignments);
       }
       toast({ title: "Success", description: "Station assignments updated" });
       setStationDialogOpen(false);
@@ -296,6 +293,17 @@ export const Users = () => {
     setSelectedStations(prev =>
       prev.includes(stationId) ? prev.filter(id => id !== stationId) : [...prev, stationId]
     );
+  };
+
+  const getRoleBadgeVariant = (role: string) => {
+    if (role === "admin") return "default";
+    return "secondary";
+  };
+
+  const getRoleLabel = (role: string) => {
+    if (role === "admin") return "Admin";
+    if (role === "manager") return "Manager";
+    return role;
   };
 
   if (!isAdmin) {
@@ -357,11 +365,11 @@ export const Users = () => {
               </div>
               <div>
                 <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, station_ids: [] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin (All Stations)</SelectItem>
-                    <SelectItem value="clerk">Clerk</SelectItem>
+                    <SelectItem value="manager">Manager (Assigned Stations)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -407,11 +415,11 @@ export const Users = () => {
             </div>
             <div>
               <Label>Role</Label>
-              <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value })}>
+              <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value, station_ids: [] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin (All Stations)</SelectItem>
-                  <SelectItem value="clerk">Clerk</SelectItem>
+                  <SelectItem value="manager">Manager (Assigned Stations)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -482,8 +490,8 @@ export const Users = () => {
                   <TableCell className="font-medium">{user.full_name}</TableCell>
                   <TableCell>{user.phone || "-"}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {user.role}
+                    <Badge variant={getRoleBadgeVariant(user.role)}>
+                      {getRoleLabel(user.role)}
                     </Badge>
                   </TableCell>
                   <TableCell>
