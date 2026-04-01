@@ -21,10 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Calendar, DollarSign, Building2 } from "lucide-react";
+import { Plus, Calendar, DollarSign, Building2, Receipt } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 import { useStation } from "@/contexts/StationContext";
+import DeliveryReceipt from "@/components/DeliveryReceipt";
 
 const paymentSchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -56,6 +57,14 @@ const Payments = () => {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<null | {
+    farmerName: string;
+    stationName: string;
+    paymentDate: string;
+    amount: number;
+    paymentMethod: string;
+    receiptNumber: string;
+  }>(null);
   const [formData, setFormData] = useState({
     farmer_id: "",
     amount: "",
@@ -163,10 +172,7 @@ const Payments = () => {
 
       if (walletError) throw walletError;
 
-      toast({
-        title: "Success",
-        description: "Payment recorded and deducted from wallet",
-      });
+      const farmer = farmers.find(f => f.id === validatedData.farmer_id);
 
       setDialogOpen(false);
       setFormData({
@@ -177,6 +183,21 @@ const Payments = () => {
         notes: "",
       });
       fetchData();
+
+      // Show payment receipt
+      setReceiptData({
+        farmerName: farmer?.name || "Farmer",
+        stationName: currentStation?.name || "Liza CWS",
+        paymentDate: validatedData.payment_date,
+        amount: validatedData.amount,
+        paymentMethod: validatedData.payment_method,
+        receiptNumber: `PAY-${Date.now().toString().slice(-6)}`,
+      });
+
+      toast({
+        title: "Success",
+        description: "Payment recorded and deducted from wallet",
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({
@@ -200,6 +221,18 @@ const Payments = () => {
 
   return (
     <div className="space-y-6">
+      {receiptData && (
+        <DeliveryReceipt
+          type="final_payment"
+          receiptNumber={receiptData.receiptNumber}
+          farmerName={receiptData.farmerName}
+          stationName={receiptData.stationName}
+          date={receiptData.paymentDate}
+          totalAmount={receiptData.amount}
+          paymentMethod={receiptData.paymentMethod}
+          onClose={() => setReceiptData(null)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
@@ -307,19 +340,35 @@ const Payments = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {new Date(payment.payment_date).toLocaleDateString()}
-                  </span>
+              <div className="flex gap-6 items-center justify-between">
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      {new Date(payment.payment_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm capitalize">
+                      {payment.payment_method.replace('_', ' ')}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm capitalize">
-                    {payment.payment_method.replace('_', ' ')}
-                  </span>
-                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setReceiptData({
+                    farmerName: payment.farmers.name,
+                    stationName: payment.stations?.name || currentStation?.name || "Liza CWS",
+                    paymentDate: payment.payment_date,
+                    amount: payment.amount,
+                    paymentMethod: payment.payment_method,
+                    receiptNumber: `PAY-${payment.id.slice(-6).toUpperCase()}`,
+                  })}
+                >
+                  <Receipt className="h-4 w-4 mr-1" /> Receipt
+                </Button>
               </div>
               {payment.notes && (
                 <p className="text-sm text-muted-foreground">{payment.notes}</p>

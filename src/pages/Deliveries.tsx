@@ -20,10 +20,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Calendar, Weight, Building2 } from "lucide-react";
+import { Plus, Calendar, Weight, Building2, Receipt } from "lucide-react";
 import { z } from "zod";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 import { useStation } from "@/contexts/StationContext";
+import DeliveryReceipt from "@/components/DeliveryReceipt";
 
 const deliverySchema = z.object({
   farmer_id: z.string().uuid({ message: "Please select a farmer" }),
@@ -54,6 +55,15 @@ const Deliveries = () => {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<null | {
+    farmerName: string;
+    stationName: string;
+    deliveryDate: string;
+    quantityKg: number;
+    pricePerKg: number;
+    totalAmount: number;
+    receiptNumber: string;
+  }>(null);
   const [formData, setFormData] = useState({
     farmer_id: "",
     quantity_kg: "",
@@ -140,10 +150,10 @@ const Deliveries = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Delivery recorded successfully",
-      });
+      // Find farmer name for receipt
+      const farmer = farmers.find(f => f.id === validatedData.farmer_id);
+      const qty = validatedData.quantity_kg;
+      const price = validatedData.price_per_kg;
 
       setDialogOpen(false);
       setFormData({
@@ -153,6 +163,22 @@ const Deliveries = () => {
         delivery_date: new Date().toISOString().split('T')[0],
       });
       fetchData();
+
+      // Show receipt
+      setReceiptData({
+        farmerName: farmer?.name || "Farmer",
+        stationName: currentStation?.name || "Liza CWS",
+        deliveryDate: validatedData.delivery_date,
+        quantityKg: qty,
+        pricePerKg: price,
+        totalAmount: qty * price,
+        receiptNumber: `DLV-${Date.now().toString().slice(-6)}`,
+      });
+
+      toast({
+        title: "Success",
+        description: "Delivery recorded successfully",
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({
@@ -176,6 +202,19 @@ const Deliveries = () => {
 
   return (
     <div className="space-y-6">
+      {receiptData && (
+        <DeliveryReceipt
+          type="delivery"
+          receiptNumber={receiptData.receiptNumber}
+          farmerName={receiptData.farmerName}
+          stationName={receiptData.stationName}
+          date={receiptData.deliveryDate}
+          quantityKg={receiptData.quantityKg}
+          pricePerKg={receiptData.pricePerKg}
+          totalAmount={receiptData.totalAmount}
+          onClose={() => setReceiptData(null)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cherry Deliveries</h1>
@@ -278,25 +317,42 @@ const Deliveries = () => {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {new Date(delivery.delivery_date).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Weight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {delivery.quantity_kg} kg @ {delivery.price_per_kg} RWF/kg
-                </span>
-              </div>
-              {delivery.stations && isAdmin && (
+            <CardContent className="flex gap-6 items-center justify-between">
+              <div className="flex gap-6">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-primary">{delivery.stations.code}</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    {new Date(delivery.delivery_date).toLocaleDateString()}
+                  </span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Weight className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    {delivery.quantity_kg} kg @ {delivery.price_per_kg} RWF/kg
+                  </span>
+                </div>
+                {delivery.stations && isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <span className="text-sm text-primary">{delivery.stations.code}</span>
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setReceiptData({
+                  farmerName: delivery.farmers.name,
+                  stationName: delivery.stations?.name || currentStation?.name || "Liza CWS",
+                  deliveryDate: delivery.delivery_date,
+                  quantityKg: delivery.quantity_kg,
+                  pricePerKg: delivery.price_per_kg,
+                  totalAmount: delivery.total_amount,
+                  receiptNumber: `DLV-${delivery.id.slice(-6).toUpperCase()}`,
+                })}
+              >
+                <Receipt className="h-4 w-4 mr-1" /> Receipt
+              </Button>
             </CardContent>
           </Card>
         ))}

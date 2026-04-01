@@ -12,7 +12,8 @@ import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 import { useStation } from "@/contexts/StationContext";
-import { Building2 } from "lucide-react";
+import { Building2, Receipt } from "lucide-react";
+import DeliveryReceipt from "@/components/DeliveryReceipt";
 
 interface Advance {
   id: string;
@@ -48,6 +49,14 @@ export default function Advances() {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<null | {
+    farmerName: string;
+    stationName: string;
+    date: string;
+    amount: number;
+    purpose: string;
+    receiptNumber: string;
+  }>(null);
   const [formData, setFormData] = useState({
     farmer_id: "",
     amount: "",
@@ -130,10 +139,21 @@ export default function Advances() {
 
       if (error) throw error;
 
+      const farmer = farmers.find(f => f.id === validatedData.farmer_id);
+
       toast.success("Advance recorded successfully");
       setOpen(false);
       setFormData({ farmer_id: "", amount: "", purpose: "" });
       fetchData();
+
+      setReceiptData({
+        farmerName: farmer?.name || "Farmer",
+        stationName: currentStation?.name || "Liza CWS",
+        date: new Date().toISOString().split("T")[0],
+        amount: validatedData.amount,
+        purpose: validatedData.purpose || "Cherry Purchase Support",
+        receiptNumber: `ADV-${Date.now().toString().slice(-6)}`,
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -153,6 +173,18 @@ export default function Advances() {
 
   return (
     <div className="p-8 space-y-6">
+      {receiptData && (
+        <DeliveryReceipt
+          type="advance"
+          receiptNumber={receiptData.receiptNumber}
+          farmerName={receiptData.farmerName}
+          stationName={receiptData.stationName}
+          date={receiptData.date}
+          totalAmount={receiptData.amount}
+          purpose={receiptData.purpose}
+          onClose={() => setReceiptData(null)}
+        />
+      )}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Farmer Advances</h1>
@@ -276,6 +308,22 @@ export default function Advances() {
                     </div>
                   </div>
                 )}
+              </div>
+              <div className="mt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setReceiptData({
+                    farmerName: advance.farmers?.name || "Farmer",
+                    stationName: advance.stations?.name || currentStation?.name || "Liza CWS",
+                    date: advance.advance_date,
+                    amount: Number(advance.amount),
+                    purpose: advance.purpose || "Cherry Purchase Support",
+                    receiptNumber: `ADV-${advance.id.slice(-6).toUpperCase()}`,
+                  })}
+                >
+                  <Receipt className="h-4 w-4 mr-1" /> Receipt
+                </Button>
               </div>
             </CardContent>
           </Card>
