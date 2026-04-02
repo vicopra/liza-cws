@@ -10,10 +10,15 @@ interface DeliveryReceiptProps {
   farmerName: string;
   stationName: string;
   date: string;
-  quantityKg?: number;
-  pricePerKg?: number;
   totalAmount: number;
   paymentMethod?: string;
+  // delivery fields
+  quantityKg?: number;
+  pricePerKg?: number;
+  // final payment breakdown
+  cherryTotal?: number;
+  advanceDeducted?: number;
+  // advance fields
   purpose?: string;
   onClose: () => void;
 }
@@ -48,7 +53,8 @@ const STAMPS = {
 
 export default function DeliveryReceipt({
   type, receiptNumber, farmerName, stationName, date,
-  quantityKg, pricePerKg, totalAmount, paymentMethod, purpose, onClose,
+  totalAmount, paymentMethod, quantityKg, pricePerKg,
+  cherryTotal, advanceDeducted, purpose, onClose,
 }: DeliveryReceiptProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const badge = BADGES[type];
@@ -62,21 +68,18 @@ export default function DeliveryReceipt({
   const handlePrint = () => {
     const content = receiptRef.current?.innerHTML;
     if (!content) return;
-    const win = window.open("", "_blank", "width=350,height=700");
+    const win = window.open("", "_blank", "width=350,height=750");
     if (!win) return;
     win.document.write(`<html><head><title>Receipt ${receiptNumber}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Courier New',monospace; font-size:11px; color:#111; background:#fff; width:280px; padding:16px 12px; }
-        .dashed { border-top:1px dashed #999; margin:8px 0; }
         .row { display:flex; justify-content:space-between; margin:3px 0; }
         .row span:first-child { color:#666; }
         .row span:last-child { font-weight:600; }
         .total { display:flex; justify-content:space-between; font-weight:700; font-size:13px; margin:4px 0; }
-        .badge { padding:3px 10px; font-size:10px; font-weight:700; letter-spacing:1px; display:inline-block; }
-        .footer { font-size:10px; text-align:center; font-style:italic; color:#444; line-height:1.6; }
-        .stamp { text-align:center; font-size:9px; color:#aaa; margin-top:8px; letter-spacing:1px; }
         .section-label { font-size:9px; font-weight:700; color:#888; letter-spacing:1px; margin-bottom:4px; text-transform:uppercase; }
+        .dash { border-top:1px dashed #999; margin:8px 0; }
       </style></head><body>${content}</body></html>`);
     win.document.close();
     win.focus();
@@ -85,7 +88,9 @@ export default function DeliveryReceipt({
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:9999 }}>
-      <div style={{ background:"#fff", borderRadius:10, padding:20, width:340, boxShadow:"0 24px 64px rgba(0,0,0,0.35)", maxHeight:"90vh", overflowY:"auto" }}>
+      <div style={{ background:"#fff", borderRadius:10, padding:20, width:360, boxShadow:"0 24px 64px rgba(0,0,0,0.35)", maxHeight:"90vh", overflowY:"auto" }}>
+
+        {/* Toolbar */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
           <span style={{ fontWeight:700, fontSize:14 }}>{titles[type]}</span>
           <div style={{ display:"flex", gap:8 }}>
@@ -96,67 +101,94 @@ export default function DeliveryReceipt({
           </div>
         </div>
 
+        {/* Receipt */}
         <div style={{ border:"1px solid #e5e7eb", borderRadius:6, padding:"14px 12px", background:"#fafafa" }}>
           <div ref={receiptRef} style={{ fontFamily:"'Courier New',monospace", fontSize:11, color:"#111", lineHeight:1.6 }}>
 
+            {/* Header */}
             <div style={{ textAlign:"center", marginBottom:8 }}>
               <div style={{ fontSize:15, fontWeight:700, letterSpacing:2 }}>☕ LIZA CWS</div>
               <div style={{ fontSize:10, color:"#555" }}>{stationName}</div>
               <div style={{ fontSize:10, color:"#555" }}>Coffee Washing Station — Rwanda</div>
             </div>
 
-            <div className="dashed" style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
+            <D />
 
+            {/* Badge */}
             <div style={{ textAlign:"center", margin:"8px 0" }}>
               <span style={{ background:badge.bg, color:badge.color, border:badge.border, padding:"3px 10px", fontSize:10, fontWeight:700, letterSpacing:1, display:"inline-block" }}>
                 {badge.label}
               </span>
             </div>
 
-            <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
+            <D />
 
             <R label="Receipt #" value={receiptNumber} />
             <R label="Date"      value={formatDate(date)} />
             <R label="Farmer"    value={farmerName} />
 
-            <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
+            <D />
 
-            {(type === "delivery" || type === "final_payment") && quantityKg !== undefined && pricePerKg !== undefined && (
+            {/* DELIVERY receipt */}
+            {type === "delivery" && quantityKg !== undefined && pricePerKg !== undefined && (
               <>
-                <div style={{ fontSize:9, fontWeight:700, color:"#888", letterSpacing:1, marginBottom:4 }}>CHERRY DELIVERY DETAILS</div>
+                <SL>CHERRY DELIVERY</SL>
                 <R label="Quantity"   value={`${quantityKg} kg`} />
                 <R label="Unit Price" value={`${fmt(pricePerKg)}/kg`} />
-                {type === "final_payment" && paymentMethod && (
+                <D />
+                <Total label="TOTAL VALUE" value={fmt(totalAmount)} />
+                <Status label="Payment Status" value="PENDING" color="#92400e" />
+              </>
+            )}
+
+            {/* FINAL PAYMENT receipt */}
+            {type === "final_payment" && (
+              <>
+                {/* Cherry delivery section */}
+                {quantityKg !== undefined && pricePerKg !== undefined && (
+                  <>
+                    <SL>CHERRY DELIVERY</SL>
+                    <R label="Quantity"    value={`${quantityKg} kg`} />
+                    <R label="Unit Price"  value={`${fmt(pricePerKg)}/kg`} />
+                    <R label="Cherry Total" value={fmt(cherryTotal ?? totalAmount)} />
+                    <D />
+                  </>
+                )}
+
+                {/* Payment breakdown */}
+                <SL>PAYMENT BREAKDOWN</SL>
+                {cherryTotal !== undefined && (
+                  <R label="Cherry Total" value={fmt(cherryTotal)} />
+                )}
+                {advanceDeducted !== undefined && advanceDeducted > 0 && (
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:3, color:"#92400e" }}>
+                    <span>Advance Deducted</span>
+                    <span style={{ fontWeight:600 }}>- {fmt(advanceDeducted)}</span>
+                  </div>
+                )}
+                {paymentMethod && (
                   <R label="Pay Method" value={paymentMethod.replace(/_/g," ").toUpperCase()} />
                 )}
-                <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
-                <div style={{ display:"flex", justifyContent:"space-between", fontWeight:700, fontSize:13 }}>
-                  <span>TOTAL</span><span>{fmt(totalAmount)}</span>
-                </div>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, marginTop:2, color: type==="final_payment" ? "#14532d" : "#92400e" }}>
-                  <span>Payment Status</span>
-                  <span style={{ fontWeight:700 }}>{type==="final_payment" ? "✓ PAID" : "PENDING"}</span>
-                </div>
+                <D />
+                <Total label="NET AMOUNT PAID" value={fmt(totalAmount)} />
+                <Status label="Payment Status" value="✓ PAID" color="#14532d" />
               </>
             )}
 
+            {/* ADVANCE receipt */}
             {type === "advance" && (
               <>
-                <div style={{ fontSize:9, fontWeight:700, color:"#888", letterSpacing:1, marginBottom:4 }}>ADVANCE PAYMENT DETAILS</div>
+                <SL>ADVANCE PAYMENT</SL>
                 <R label="Type"    value="ADVANCE PAYMENT" />
                 <R label="Purpose" value={purpose || "Cherry Purchase Support"} />
-                <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
-                <div style={{ display:"flex", justifyContent:"space-between", fontWeight:700, fontSize:13 }}>
-                  <span>AMOUNT ADVANCED</span><span>{fmt(totalAmount)}</span>
-                </div>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, marginTop:2, color:"#1e3a8a" }}>
-                  <span>Recovery Status</span>
-                  <span style={{ fontWeight:700 }}>PENDING RECOVERY</span>
-                </div>
+                <D />
+                <Total label="AMOUNT ADVANCED" value={fmt(totalAmount)} />
+                <Status label="Recovery Status" value="PENDING RECOVERY" color="#1e3a8a" />
               </>
             )}
 
-            <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />
+            <D />
+
             <div style={{ fontSize:10, textAlign:"center", fontStyle:"italic", color:"#444", lineHeight:1.6 }}>
               {FOOTERS[type](farmerName.split(" ")[0])}
             </div>
@@ -175,6 +207,31 @@ function R({ label, value }: { label: string; value: string }) {
     <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:3 }}>
       <span style={{ color:"#666" }}>{label}</span>
       <span style={{ fontWeight:600 }}>{value}</span>
+    </div>
+  );
+}
+
+function D() {
+  return <div style={{ borderTop:"1px dashed #ccc", margin:"8px 0" }} />;
+}
+
+function SL({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize:9, fontWeight:700, color:"#888", letterSpacing:1, marginBottom:4, textTransform:"uppercase" }}>{children}</div>;
+}
+
+function Total({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display:"flex", justifyContent:"space-between", fontWeight:700, fontSize:13, margin:"4px 0" }}>
+      <span>{label}</span><span>{value}</span>
+    </div>
+  );
+}
+
+function Status({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, marginTop:2, color }}>
+      <span>{label}</span>
+      <span style={{ fontWeight:700 }}>{value}</span>
     </div>
   );
 }
