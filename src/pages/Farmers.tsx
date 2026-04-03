@@ -61,6 +61,85 @@ const emptyForm = {
   cell: "", farmer_type: "small", notes: "",
 };
 
+// ─── FarmerFormFields is defined OUTSIDE Farmers so React never remounts it ──
+
+interface FarmerFormFieldsProps {
+  data: typeof emptyForm;
+  setData: (d: typeof emptyForm) => void;
+}
+
+const FarmerFormFields = ({ data, setData }: FarmerFormFieldsProps) => (
+  <>
+    <div>
+      <Label>Farmer Type *</Label>
+      <Select value={data.farmer_type} onValueChange={v => setData({ ...data, farmer_type: v })}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="small">Small Farmer</SelectItem>
+          <SelectItem value="acheteur">Big Farmer (Acheteur)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div>
+      <Label>Full Name *</Label>
+      <Input
+        placeholder="Enter full name"
+        value={data.name}
+        onChange={e => setData({ ...data, name: e.target.value })}
+        required
+      />
+    </div>
+    <div>
+      <Label>Phone Number</Label>
+      <div className="relative">
+        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-10"
+          placeholder="0781234567"
+          value={data.phone}
+          onChange={e => setData({ ...data, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+        />
+      </div>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Cell</Label>
+        <Input
+          placeholder="Administrative cell"
+          value={data.cell}
+          onChange={e => setData({ ...data, cell: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label>Village</Label>
+        <Input
+          placeholder="Village name"
+          value={data.village}
+          onChange={e => setData({ ...data, village: e.target.value })}
+        />
+      </div>
+    </div>
+    <div>
+      <Label>National ID</Label>
+      <Input
+        placeholder="16-digit ID number"
+        value={data.id_number}
+        onChange={e => setData({ ...data, id_number: e.target.value.replace(/\D/g, '').slice(0, 16) })}
+      />
+    </div>
+    <div>
+      <Label>Notes (Optional)</Label>
+      <Textarea
+        placeholder="Any additional information..."
+        value={data.notes}
+        onChange={e => setData({ ...data, notes: e.target.value })}
+      />
+    </div>
+  </>
+);
+
+// ─── Main Farmers Page ────────────────────────────────────────────────────────
+
 const Farmers = () => {
   const { currentStation, userStations, isAdmin } = useStation();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
@@ -225,56 +304,6 @@ const Farmers = () => {
     link.click();
     toast({ title: "Success", description: "Farmers list exported" });
   };
-
-  const FarmerFormFields = ({ data, setData }: { data: typeof emptyForm, setData: (d: typeof emptyForm) => void }) => (
-    <>
-      <div>
-        <Label>Farmer Type *</Label>
-        <Select value={data.farmer_type} onValueChange={v => setData({ ...data, farmer_type: v })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="small">Small Farmer</SelectItem>
-            <SelectItem value="acheteur">Big Farmer (Acheteur)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label>Full Name *</Label>
-        <Input placeholder="Enter full name" value={data.name}
-          onChange={e => setData({ ...data, name: e.target.value })} required />
-      </div>
-      <div>
-        <Label>Phone Number</Label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-10" placeholder="0781234567" value={data.phone}
-            onChange={e => setData({ ...data, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Cell</Label>
-          <Input placeholder="Administrative cell" value={data.cell}
-            onChange={e => setData({ ...data, cell: e.target.value })} />
-        </div>
-        <div>
-          <Label>Village</Label>
-          <Input placeholder="Village name" value={data.village}
-            onChange={e => setData({ ...data, village: e.target.value })} />
-        </div>
-      </div>
-      <div>
-        <Label>National ID</Label>
-        <Input placeholder="16-digit ID number" value={data.id_number}
-          onChange={e => setData({ ...data, id_number: e.target.value.replace(/\D/g, '').slice(0, 16) })} />
-      </div>
-      <div>
-        <Label>Notes (Optional)</Label>
-        <Textarea placeholder="Any additional information..." value={data.notes}
-          onChange={e => setData({ ...data, notes: e.target.value })} />
-      </div>
-    </>
-  );
 
   if (loading) return <div className="flex items-center justify-center min-h-[400px]">Loading...</div>;
 
@@ -442,7 +471,6 @@ const Farmers = () => {
                               </Badge>
                             </div>
                           </div>
-                          {/* Action buttons */}
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8"
                               onClick={e => openEditDialog(farmer, e)}>
@@ -674,7 +702,12 @@ const Farmers = () => {
                   <div><p className="text-xs text-muted-foreground">Cell</p><p className="font-medium">{selectedFarmer.cell || "-"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Village</p><p className="font-medium">{selectedFarmer.village || "-"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Registered</p><p className="font-medium">{format(new Date(selectedFarmer.created_at), "MMM dd, yyyy")}</p></div>
-                  {selectedFarmer.notes && <div className="col-span-2"><p className="text-xs text-muted-foreground">Notes</p><p className="font-medium">{selectedFarmer.notes}</p></div>}
+                  {selectedFarmer.notes && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Notes</p>
+                      <p className="font-medium">{selectedFarmer.notes}</p>
+                    </div>
+                  )}
                 </div>
 
                 {(() => {
@@ -711,15 +744,16 @@ const Farmers = () => {
                       <TableBody>
                         {deliveries.filter(d => d.farmer_id === selectedFarmer.id).length === 0 ? (
                           <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No deliveries yet</TableCell></TableRow>
-                        ) : deliveries.filter(d => d.farmer_id === selectedFarmer.id)
-                          .sort((a, b) => new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime())
-                          .map(d => (
-                            <TableRow key={d.id}>
-                              <TableCell>{format(new Date(d.delivery_date), "MMM dd, yyyy")}</TableCell>
-                              <TableCell className="text-right">{Number(d.quantity_kg).toFixed(1)} kg</TableCell>
-                              <TableCell className="text-right">{d.price_per_kg ? `${Number(d.price_per_kg).toLocaleString()} RWF` : "-"}</TableCell>
-                            </TableRow>
-                          ))}
+                        ) : deliveries
+                            .filter(d => d.farmer_id === selectedFarmer.id)
+                            .sort((a, b) => new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime())
+                            .map(d => (
+                              <TableRow key={d.id}>
+                                <TableCell>{format(new Date(d.delivery_date), "MMM dd, yyyy")}</TableCell>
+                                <TableCell className="text-right">{Number(d.quantity_kg).toFixed(1)} kg</TableCell>
+                                <TableCell className="text-right">{d.price_per_kg ? `${Number(d.price_per_kg).toLocaleString()} RWF` : "-"}</TableCell>
+                              </TableRow>
+                            ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -740,16 +774,17 @@ const Farmers = () => {
                       <TableBody>
                         {payments.filter(p => p.farmer_id === selectedFarmer.id).length === 0 ? (
                           <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No payments yet</TableCell></TableRow>
-                        ) : payments.filter(p => p.farmer_id === selectedFarmer.id)
-                          .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
-                          .map(p => (
-                            <TableRow key={p.id}>
-                              <TableCell>{format(new Date(p.payment_date), "MMM dd, yyyy")}</TableCell>
-                              <TableCell><Badge variant={p.payment_type === 'advance' ? 'secondary' : 'default'}>{p.payment_type}</Badge></TableCell>
-                              <TableCell className="text-right">{Number(p.amount).toLocaleString()} RWF</TableCell>
-                              <TableCell className="text-muted-foreground text-sm">{p.notes || "-"}</TableCell>
-                            </TableRow>
-                          ))}
+                        ) : payments
+                            .filter(p => p.farmer_id === selectedFarmer.id)
+                            .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
+                            .map(p => (
+                              <TableRow key={p.id}>
+                                <TableCell>{format(new Date(p.payment_date), "MMM dd, yyyy")}</TableCell>
+                                <TableCell><Badge variant={p.payment_type === 'advance' ? 'secondary' : 'default'}>{p.payment_type}</Badge></TableCell>
+                                <TableCell className="text-right">{Number(p.amount).toLocaleString()} RWF</TableCell>
+                                <TableCell className="text-muted-foreground text-sm">{p.notes || "-"}</TableCell>
+                              </TableRow>
+                            ))}
                       </TableBody>
                     </Table>
                   </div>
