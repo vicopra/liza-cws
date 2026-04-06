@@ -60,10 +60,13 @@ interface FarmerBalance {
   farmer_type: string;
   total_kg: number;
   total_delivery_value: number;
-  total_advances: number;
+  total_advances: number;          // total ever given
+  advance_outstanding: number;     // remaining balance still owed by farmer
+  advance_recovered: number;       // how much has been recovered via deliveries
   total_payments: number;
-  // positive = we owe farmer; negative = farmer still has advance credit
-  net_balance: number;
+  amount_owed_to_farmer: number;   // how much we owe the farmer right now
+  remaining_advance: number;       // advance farmer still needs to cover
+  net_balance: number;             // positive = we owe farmer; negative = farmer owes us
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,7 +106,7 @@ const Deliveries = () => {
   const { currentStation, userStations, isAdmin } = useStation();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
-  const [advances, setAdvances] = useState<{ farmer_id: string; balance: number }[]>([]);
+  const [advances, setAdvances] = useState<{ farmer_id: string; amount: number; amount_recovered: number; balance: number; status: string }[]>([]);
   const [payments, setPayments] = useState<{ farmer_id: string; amount: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -144,8 +147,8 @@ const Deliveries = () => {
       const { data: fData, error: fErr } = await fQ;
       if (fErr) throw fErr;
 
-      // Fetch active advances balances
-      let aQ = supabase.from("farmer_advances").select("farmer_id, balance").eq("status", "active");
+      // Fetch ALL advances (active + partial + recovered) for complete balance calculation
+      let aQ = supabase.from("farmer_advances").select("farmer_id, amount, amount_recovered, balance, status");
       if (currentStation) aQ = aQ.eq("station_id", currentStation.id);
       const { data: aData } = await aQ;
 
@@ -171,24 +174,48 @@ const Deliveries = () => {
   const farmerBalances = useMemo<FarmerBalance[]>(() => {
     return farmers.map(farmer => {
       const farmerDeliveries = deliveries.filter(d => d.farmer_id === farmer.id);
+      const farmerAdvances = advances.filter(a => a.farmer_id === farmer.id);
+      const farmerPayments = payments.filter(p => p.farmer_id === farmer.id);
+
       const total_kg = farmerDeliveries.reduce((s, d) => s + Number(d.quantity_kg), 0);
       const total_delivery_value = farmerDeliveries.reduce((s, d) => s + Number(d.total_amount), 0);
-      const total_advances = advances
-        .filter(a => a.farmer_id === farmer.id)
+
+      // Total advances GIVEN (all statuses — historical total)
+      const total_advances_given = farmerAdvances.reduce((s, a) => s + Number(a.amount), 0);
+
+      // Remaining outstanding advance balance (only active + partial)
+      const advance_outstanding = farmerAdvances
+        .filter(a => a.status === "active" || a.status === "partial")
         .reduce((s, a) => s + Number(a.balance), 0);
-      const total_payments = payments
-        .filter(p => p.farmer_id === farmer.id)
-        .reduce((s, p) => s + Number(p.amount), 0);
-      // Balance = deliveries - advances_outstanding - payments_made
-      const net_balance = total_delivery_value - total_advances - total_payments;
+
+      // Total recovered from advances via deliveries
+      const advance_recovered = farmerAdvances.reduce((s, a) => s + Number(a.amount_recovered), 0);
+
+      const total_payments = farmerPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+      // Net balance:
+      // positive = we owe the farmer (delivery value > advances given + payments made)
+      // negative = farmer still owes us (advance not yet covered by deliveries)
+      const net_balance = total_delivery_value - total_advances_given - total_payments + advance_recovered;
+
+      // Amount currently owed TO the farmer (only if positive)
+      const amount_owed_to_farmer = Math.max(0, net_balance);
+
+      // Remaining advance the farmer still needs to cover with future deliveries
+      const remaining_advance = advance_outstanding;
+
       return {
         farmer_id: farmer.id,
         farmer_name: farmer.name,
         farmer_type: farmer.farmer_type ?? "small",
         total_kg,
         total_delivery_value,
-        total_advances,
+        total_advances: total_advances_given,
+        advance_outstanding,
+        advance_recovered,
         total_payments,
+        amount_owed_to_farmer,
+        remaining_advance,
         net_balance,
       };
     }).filter(b => b.total_kg > 0 || b.total_advances > 0);
@@ -246,32 +273,44 @@ const Deliveries = () => {
         }
       }
 
-      // Auto-reduce active advances for this farmer (fire-and-forget — never block the delivery)
+      // Auto-reduce active/partial advances for this farmer (oldest first)
+      // This never blocks the delivery — wrapped in its own try/catch
       try {
-        const { data: farmerAdvances } = await supabase
+        const { data: farmerAdvances, error: advFetchErr } = await supabase
           .from("farmer_advances")
-          .select("id, balance, amount_recovered")
+          .select("id, amount, balance, amount_recovered")
           .eq("farmer_id", validated.farmer_id)
           .in("status", ["active", "partial"])
           .order("created_at", { ascending: true });
 
+        if (advFetchErr) throw advFetchErr;
+
         if (farmerAdvances && farmerAdvances.length > 0) {
+          // `remaining` is how much of the delivery value is still available to reduce advances
           let remaining = totalAmount;
+
           for (const adv of farmerAdvances) {
             if (remaining <= 0) break;
-            const advBalance = Number(adv.balance);
-            const alreadyRecovered = Number(adv.amount_recovered);
+
+            const advBalance = Number(adv.balance);           // still-outstanding on this advance
+            const alreadyRecovered = Number(adv.amount_recovered); // already recovered before this delivery
+
             if (remaining >= advBalance) {
+              // This delivery fully clears this advance
+              const recovered = alreadyRecovered + advBalance;
               await supabase.from("farmer_advances").update({
-                amount_recovered: alreadyRecovered + advBalance,
+                amount_recovered: recovered,
                 balance: 0,
                 status: "recovered",
               }).eq("id", adv.id);
               remaining -= advBalance;
             } else {
+              // Delivery partially reduces this advance
+              const recovered = alreadyRecovered + remaining;
+              const newBalance = advBalance - remaining;
               await supabase.from("farmer_advances").update({
-                amount_recovered: alreadyRecovered + remaining,
-                balance: advBalance - remaining,
+                amount_recovered: recovered,
+                balance: Math.max(0, newBalance), // never go below 0
                 status: "partial",
               }).eq("id", adv.id);
               remaining = 0;
@@ -279,7 +318,6 @@ const Deliveries = () => {
           }
         }
       } catch (advErr) {
-        // Don't fail the whole delivery if advance update fails
         console.warn("Advance auto-reduction failed (non-critical):", advErr);
       }
 
@@ -409,9 +447,9 @@ const Deliveries = () => {
                   {selectedFarmer && (
                     <div className="flex items-center gap-2">
                       <FarmerTypeBadge type={selectedFarmer.farmer_type} />
-                      {selectedFarmerBalance && selectedFarmerBalance.total_advances > 0 && (
+                      {selectedFarmerBalance && selectedFarmerBalance.advance_outstanding > 0 && (
                         <span className="text-xs text-orange-600">
-                          Active advance: {fmt(selectedFarmerBalance.total_advances)} — will be auto-reduced
+                          Active advance: {fmt(selectedFarmerBalance.advance_outstanding)} — will be auto-reduced
                         </span>
                       )}
                     </div>
@@ -441,16 +479,16 @@ const Deliveries = () => {
                     <p className="text-sm font-medium">
                       Total: {fmt(parseFloat(formData.quantity_kg) * parseFloat(formData.price_per_kg))}
                     </p>
-                    {selectedFarmerBalance && selectedFarmerBalance.total_advances > 0 && (
+                    {selectedFarmerBalance && selectedFarmerBalance.advance_outstanding > 0 && (
                       <>
                         <p className="text-xs text-orange-600">
-                          Advance outstanding: {fmt(selectedFarmerBalance.total_advances)}
+                          Advance outstanding: {fmt(selectedFarmerBalance.advance_outstanding)}
                         </p>
                         {(() => {
                           const deliveryVal = parseFloat(formData.quantity_kg) * parseFloat(formData.price_per_kg);
-                          const adv = selectedFarmerBalance.total_advances;
+                          const adv = selectedFarmerBalance.advance_outstanding;
                           if (deliveryVal >= adv) {
-                            return <p className="text-xs text-green-600">Advance fully cleared. Owed to farmer: {fmt(deliveryVal - adv)}</p>;
+                            return <p className="text-xs text-green-600">✓ Advance fully cleared. Owed to farmer: {fmt(deliveryVal - adv)}</p>;
                           } else {
                             return <p className="text-xs text-orange-600">Remaining advance after delivery: {fmt(adv - deliveryVal)}</p>;
                           }
@@ -639,13 +677,13 @@ const Deliveries = () => {
         {/* ── Farmer Balances ── */}
         <TabsContent value="balances" className="space-y-3 mt-4">
           <p className="text-sm text-muted-foreground">
-            Balance = Delivery Value − Active Advances − Payments Made
+            Net Balance = Delivery Value − Total Advances Given + Recovered − Payments Made
           </p>
           {farmerBalances.length === 0 ? (
             <Card><CardContent className="pt-6 text-center text-muted-foreground">No data yet.</CardContent></Card>
           ) : (
             farmerBalances.map(fb => (
-              <Card key={fb.farmer_id}>
+              <Card key={fb.farmer_id} className={fb.remaining_advance > 0 ? "border-orange-300/50" : fb.amount_owed_to_farmer > 0 ? "border-green-300/50" : ""}>
                 <button
                   className="w-full text-left px-6 py-4 flex items-center justify-between hover:bg-muted/40 transition-colors rounded-lg"
                   onClick={() => setExpandedFarmer(expandedFarmer === fb.farmer_id ? null : fb.farmer_id)}
@@ -656,37 +694,74 @@ const Deliveries = () => {
                       : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                     <div>
                       <span className="font-semibold">{fb.farmer_name}</span>
-                      <div className="mt-0.5"><FarmerTypeBadge type={fb.farmer_type} /></div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <FarmerTypeBadge type={fb.farmer_type} />
+                        <span className="text-xs text-muted-foreground">{fb.total_kg.toFixed(1)} kg delivered</span>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-bold text-lg ${fb.net_balance >= 0 ? "text-green-700" : "text-destructive"}`}>
-                      {fmt(Math.abs(fb.net_balance))}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {fb.net_balance > 0 ? "We owe farmer" : fb.net_balance < 0 ? "Farmer has credit" : "Settled"}
-                    </p>
+                    {fb.remaining_advance > 0 ? (
+                      <>
+                        <p className="font-bold text-lg text-orange-600">{fmt(fb.remaining_advance)}</p>
+                        <p className="text-xs text-muted-foreground">Advance to recover</p>
+                      </>
+                    ) : fb.amount_owed_to_farmer > 0 ? (
+                      <>
+                        <p className="font-bold text-lg text-green-700">{fmt(fb.amount_owed_to_farmer)}</p>
+                        <p className="text-xs text-muted-foreground">We owe farmer</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-bold text-lg text-muted-foreground">{fmt(0)}</p>
+                        <p className="text-xs text-muted-foreground">Settled</p>
+                      </>
+                    )}
                   </div>
                 </button>
                 {expandedFarmer === fb.farmer_id && (
                   <CardContent className="pt-0 pb-4 px-6 border-t">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-3 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-3 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Total KG</p>
+                        <p className="text-muted-foreground">Total KG Delivered</p>
                         <p className="font-semibold">{fb.total_kg.toFixed(1)} kg</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Delivery Value</p>
+                        <p className="text-muted-foreground">Total Delivery Value</p>
                         <p className="font-semibold text-primary">{fmt(fb.total_delivery_value)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Active Advances</p>
+                        <p className="text-muted-foreground">Total Advances Given</p>
                         <p className="font-semibold text-orange-600">{fmt(fb.total_advances)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Advance Recovered</p>
+                        <p className="font-semibold text-blue-600">{fmt(fb.advance_recovered)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Remaining Advance</p>
+                        <p className={`font-semibold ${fb.remaining_advance > 0 ? "text-orange-600" : "text-muted-foreground"}`}>
+                          {fmt(fb.remaining_advance)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Payments Made</p>
                         <p className="font-semibold text-green-700">{fmt(fb.total_payments)}</p>
                       </div>
+                    </div>
+                    {/* Clear summary line */}
+                    <div className={`mt-2 px-3 py-2 rounded-md text-sm font-medium ${
+                      fb.remaining_advance > 0
+                        ? "bg-orange-50 text-orange-700 border border-orange-200"
+                        : fb.amount_owed_to_farmer > 0
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {fb.remaining_advance > 0
+                        ? `Farmer still needs to deliver ${fmt(fb.remaining_advance)} worth of cherries to clear their advance.`
+                        : fb.amount_owed_to_farmer > 0
+                        ? `We owe this farmer ${fmt(fb.amount_owed_to_farmer)} after all advances and payments.`
+                        : "All advances and payments are settled."}
                     </div>
                   </CardContent>
                 )}
