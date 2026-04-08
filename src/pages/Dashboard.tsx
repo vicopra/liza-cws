@@ -79,7 +79,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  useEffect(() => { fetchAll(); }, [currentStation, leaderFilter]);
+  useEffect(() => { fetchAll(); }, [currentStation, leaderFilter, view]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -127,23 +127,22 @@ export const Dashboard = () => {
         .map(([date, price]) => ({ date: format(new Date(date), "MMM dd"), price }));
       setPriceHistory(priceArr);
 
-      // ── Today's payments ──
-      const { data: todayPay } = await sf(
-        supabase.from("payments").select("amount").eq("payment_date", today)
-      );
+      // ── Payments (today or all-time based on view) ──
+      let payQ = sf(supabase.from("payments").select("amount"));
+      if (view === "today") payQ = payQ.eq("payment_date", today);
+      const { data: todayPay } = await payQ;
       const todayPayments = todayPay?.reduce((s, p) => s + Number(p.amount), 0) ?? 0;
 
-      // ── Today's expenses ──
-      const { data: todayExp } = await sf(
-        supabase.from("wallet_transactions").select("amount")
-          .eq("transaction_type", "expense").eq("transaction_date", today)
-      );
+      // ── Expenses (today or all-time based on view) ──
+      let expQ = sf(supabase.from("wallet_transactions").select("amount").eq("transaction_type", "expense"));
+      if (view === "today") expQ = expQ.eq("transaction_date", today);
+      const { data: todayExp } = await expQ;
       const todayExpenses = todayExp?.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
 
-      // ── Today's advances ──
-      const { data: todayAdv } = await sf(
-        supabase.from("farmer_advances").select("amount").eq("advance_date", today)
-      );
+      // ── Advances (today or all-time based on view) ──
+      let advQ = sf(supabase.from("farmer_advances").select("amount"));
+      if (view === "today") advQ = advQ.eq("advance_date", today);
+      const { data: todayAdv } = await advQ;
       const todayAdvances = todayAdv?.reduce((s, a) => s + Number(a.amount), 0) ?? 0;
 
       // ── Wallet balance (all time) ──
@@ -162,7 +161,7 @@ export const Dashboard = () => {
       }, 0) ?? 0;
       setWalletTx((walletData ?? []).slice(0, 10) as WalletTx[]);
 
-      // ── Owed to farmers (delivery value - payments) ──
+      // ── Owed to farmers (delivery value - payments - advances) ──
       const { data: allDel } = await sf(
         supabase.from("cherry_deliveries").select("farmer_id, total_amount")
       );
@@ -173,7 +172,6 @@ export const Dashboard = () => {
         supabase.from("farmer_advances").select("farmer_id, amount")
       );
 
-      // Group by farmer
       const deliveryMap = new Map<string, number>();
       allDel?.forEach((d: any) => {
         deliveryMap.set(d.farmer_id, (deliveryMap.get(d.farmer_id) ?? 0) + Number(d.total_amount ?? 0));
@@ -195,7 +193,6 @@ export const Dashboard = () => {
         if (balance > 0) owedToFarmers += balance;
         else if (balance < 0) farmersOweUs += Math.abs(balance);
       });
-      // Farmers who got advances without enough deliveries
       advMap.forEach((advAmt, farmerId) => {
         if (!deliveryMap.has(farmerId)) farmersOweUs += advAmt;
       });
@@ -280,9 +277,9 @@ export const Dashboard = () => {
       ["Total Farmers", stats.totalFarmers.toString()],
       ["Today's KG", stats.todayKg.toFixed(2)],
       ["Season KG", stats.seasonKg.toFixed(2)],
-      ["Today's Payments", stats.todayPayments.toString()],
-      ["Today's Expenses", stats.todayExpenses.toString()],
-      ["Today's Advances", stats.todayAdvances.toString()],
+      ["Payments", stats.todayPayments.toString()],
+      ["Expenses", stats.todayExpenses.toString()],
+      ["Advances", stats.todayAdvances.toString()],
       ["Wallet Balance", stats.walletBalance.toString()],
       ["Owed to Farmers", stats.owedToFarmers.toString()],
       ["Farmers Owe Us", stats.farmersOweUs.toString()],
@@ -370,12 +367,18 @@ export const Dashboard = () => {
 
         <Card className="border-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Cherry</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {view === "today" ? "Today's Cherry" : "Season Cherry"}
+            </CardTitle>
             <Coffee className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.todayKg.toFixed(1)} kg</div>
-            <p className="text-xs text-muted-foreground">{stats.todayDeliveries} deliveries today</p>
+            <div className="text-2xl font-bold text-green-600">
+              {view === "today" ? stats.todayKg.toFixed(1) : stats.seasonKg.toFixed(1)} kg
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {view === "today" ? `${stats.todayDeliveries} deliveries today` : "All cherry received"}
+            </p>
           </CardContent>
         </Card>
 
@@ -402,40 +405,54 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* ── Row 2: Today's Financial Activity ── */}
+      {/* ── Row 2: Financial Activity ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Today's Financial Activity</h2>
+        <h2 className="text-lg font-semibold mb-3">
+          {view === "today" ? "Today's Financial Activity" : "Overall Financial Activity"}
+        </h2>
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Payments Today</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {view === "today" ? "Payments Today" : "Total Payments"}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">{fmt(stats.todayPayments)}</div>
-              <p className="text-xs text-muted-foreground">Paid to farmers</p>
+              <p className="text-xs text-muted-foreground">
+                {view === "today" ? "Paid to farmers today" : "Total paid to farmers"}
+              </p>
             </CardContent>
           </Card>
 
           <Card className="border-red-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Expenses Today</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {view === "today" ? "Expenses Today" : "Total Expenses"}
+              </CardTitle>
               <Receipt className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{fmt(stats.todayExpenses)}</div>
-              <p className="text-xs text-muted-foreground">Operational expenses</p>
+              <p className="text-xs text-muted-foreground">
+                {view === "today" ? "Operational expenses today" : "Total operational expenses"}
+              </p>
             </CardContent>
           </Card>
 
           <Card className="border-yellow-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Advances Today</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {view === "today" ? "Advances Today" : "Total Advances"}
+              </CardTitle>
               <TrendingDown className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">{fmt(stats.todayAdvances)}</div>
-              <p className="text-xs text-muted-foreground">Advances given today</p>
+              <p className="text-xs text-muted-foreground">
+                {view === "today" ? "Advances given today" : "Total advances given"}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -483,8 +500,6 @@ export const Dashboard = () => {
 
       {/* ── Charts Row ── */}
       <div className="grid gap-6 lg:grid-cols-2">
-
-        {/* Daily Production Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Daily Cherry Production (Last 14 Days)</CardTitle>
@@ -506,7 +521,6 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Cherry Price Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Cherry Price History (RWF/kg)</CardTitle>
