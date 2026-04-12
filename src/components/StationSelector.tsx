@@ -52,7 +52,7 @@ export const StationSelector = () => {
       <DialogTrigger asChild>
         <Button 
           variant="outline" 
-          className="w-[200px] justify-between bg-background/20 border-background/30 text-primary-foreground hover:bg-background/30 hover:text-primary-foreground"
+          className="w-[260px] justify-between bg-background/20 border-background/30 text-primary-foreground hover:bg-background/30 hover:text-primary-foreground"
         >
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 flex-shrink-0" />
